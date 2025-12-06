@@ -11,6 +11,179 @@
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Firebase SDKs (Modular - CDN Version for Browser) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- KONFIGURASI FIREBASE KAMU ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyARoWTlJTd5eWIZP51QOhFihgOssAjz8R8",
+            authDomain: "donasi-banjir.firebaseapp.com",
+            projectId: "donasi-banjir",
+            storageBucket: "donasi-banjir.firebasestorage.app",
+            messagingSenderId: "407787434296",
+            appId: "1:407787434296:web:85d491bab2ca3b9d4cd1cd"
+        };
+
+        // Variabel Global
+        let db, auth, docRef;
+        let useLocalStorage = false;
+
+        async function initApp() {
+            try {
+                // 1. Inisialisasi Firebase dengan config kamu
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // 2. Login Anonymously (Agar user publik bisa baca/tulis data terbatas)
+                await signInAnonymously(auth);
+
+                // 3. Tentukan Lokasi Data di Database
+                // Path sederhana: collection 'campaigns' -> doc 'sumatera_2025'
+                docRef = doc(db, 'campaigns', 'sumatera_2025');
+                
+                // 4. Mulai Dengarkan Data (Real-time)
+                setupRealtimeListener();
+
+            } catch (e) {
+                console.warn("Gagal connect ke Firebase (Cek koneksi/aturan database). Beralih ke mode offline.", e);
+                useLocalStorage = true;
+                loadFromLocal();
+            }
+        }
+
+        // --- DATA LISTENER (READ) ---
+        function setupRealtimeListener() {
+            onSnapshot(docRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    updateUI(data);
+                } else {
+                    // Jika dokumen belum ada di database kamu, buat data awal
+                    initializeDB();
+                }
+            }, (error) => {
+                console.error("Error mengambil data:", error);
+                // Jika error permission/koneksi, fallback ke lokal
+                if (!useLocalStorage) {
+                   useLocalStorage = true;
+                   loadFromLocal();
+                }
+            });
+        }
+
+        // --- INISIALISASI DATA AWAL (WRITE) ---
+        async function initializeDB() {
+            const initialData = {
+                totalDonation: 154250000,
+                messages: [
+                    "Terima kasih Budi S. (Medan) - Rp 500.000",
+                    "Terima kasih Hamba Allah (Padang) - Rp 1.000.000",
+                    "Terima kasih Siti A. (Aceh) - Rp 250.000",
+                    "Solidaritas Alumni Tambang - Rp 5.000.000",
+                    "Doa terbaik untuk saudara di Sumatera."
+                ],
+                strategicPlan: [
+                    { id: 1, activity: "Belanja Logistik (Di Jawa)", status: "Sedang Berjalan", statusColor: "bg-green-100 text-green-700", plan: "Sarden, Abon, Susu", actual: "Stop Beras/Air", next: "Packing Kargo" },
+                    { id: 2, activity: "Pengiriman Kargo Udara", status: "Prioritas", statusColor: "bg-red-100 text-red-700", plan: "Via Pesawat (Cepat)", actual: "Darat Putus", next: "Tujuan: FISIP USK" },
+                    { id: 3, activity: "Pengadaan Tenda", status: "Rencana", statusColor: "bg-blue-100 text-blue-700", plan: "Cari Vendor Tenda", actual: "Warga Tidur di Jalan", next: "Negosiasi" }
+                ]
+            };
+            
+            if (!useLocalStorage) {
+                try {
+                    await setDoc(docRef, initialData);
+                } catch (e) {
+                    console.error("Gagal menulis data awal (Mungkin perlu atur Firestore Rules):", e);
+                }
+            } else {
+                localStorage.setItem('flood_data', JSON.stringify(initialData));
+                updateUI(initialData);
+            }
+        }
+
+        // --- FUNGSI UPDATE GLOBAL (WRITE) ---
+        window.saveDonationToBackend = async (newTotal) => {
+            if (!useLocalStorage) {
+                await updateDoc(docRef, { totalDonation: Number(newTotal) });
+            } else {
+                updateLocalData('totalDonation', Number(newTotal));
+            }
+        };
+
+        window.saveMessageToBackend = async (msg) => {
+            if (!useLocalStorage) {
+                await updateDoc(docRef, { messages: arrayUnion(msg) });
+            } else {
+                let data = JSON.parse(localStorage.getItem('flood_data'));
+                data.messages.unshift(msg);
+                localStorage.setItem('flood_data', JSON.stringify(data));
+                updateUI(data);
+            }
+        };
+
+        window.savePlanToBackend = async (newPlan) => {
+            if (!useLocalStorage) {
+                await updateDoc(docRef, { strategicPlan: newPlan });
+            } else {
+                updateLocalData('strategicPlan', newPlan);
+            }
+        };
+
+        // --- LOCAL STORAGE HELPERS ---
+        function loadFromLocal() {
+            const localData = localStorage.getItem('flood_data');
+            if (localData) {
+                updateUI(JSON.parse(localData));
+            } else {
+                // Data dummy lokal jika kosong
+                initializeDB(); 
+            }
+        }
+        
+        function updateLocalData(key, value) {
+            let data = JSON.parse(localStorage.getItem('flood_data')) || {};
+            data[key] = value;
+            localStorage.setItem('flood_data', JSON.stringify(data));
+            updateUI(data);
+        }
+
+        // --- UPDATE UI HANDLER ---
+        function updateUI(data) {
+            window.appState = data;
+            
+            // Render Total
+            if(data.totalDonation) {
+                document.getElementById('total-amount-display').innerText = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.totalDonation);
+                document.getElementById('total-input').value = data.totalDonation;
+            }
+            
+            // Render Marquee
+            if(data.messages) {
+                const container = document.getElementById('marquee-container');
+                const items = data.messages.map(msg => `
+                    <span class="flex items-center gap-2 text-sm font-medium text-blue-200 mx-4">
+                        <i data-lucide="heart" class="w-4 h-4 text-red-500 fill-red-500"></i> ${msg}
+                    </span>
+                `).join('');
+                container.innerHTML = items + items;
+            }
+            
+            // Render Plan
+            if(data.strategicPlan) {
+                renderPlanTable(data.strategicPlan);
+            }
+            
+            lucide.createIcons();
+        }
+
+        // Start App
+        initApp();
+    </script>
+
     <!-- Custom Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 
@@ -27,11 +200,9 @@
             animation: marquee 40s linear infinite;
         }
         
-        /* Custom Scrollbar for better UX */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
@@ -39,13 +210,13 @@
     <!-- RUNNING TEXT SECTION -->
     <div class="bg-slate-900 text-white py-2 overflow-hidden relative z-20 shadow-md">
         <div id="marquee-container" class="animate-marquee items-center gap-8 whitespace-nowrap pl-4">
-            <!-- Content will be injected by JS -->
+            <!-- Loading State -->
+            <span class="text-blue-200 text-sm">Menghubungkan ke database donasi...</span>
         </div>
     </div>
 
     <!-- HERO SECTION -->
     <header class="bg-gradient-to-br from-blue-700 to-slate-800 text-white pt-6 pb-24 px-4 relative overflow-hidden">
-        <!-- Background Pattern -->
         <div class="absolute top-0 left-0 w-full h-full opacity-10" style="background-image: url('https://www.transparenttextures.com/patterns/rain.png');"></div>
         
         <div class="max-w-4xl mx-auto relative z-10">
@@ -76,25 +247,23 @@
                 </div>
                 
                 <div class="flex items-center justify-center gap-3">
-                    <!-- Display Mode -->
                     <div id="display-mode" class="relative group">
                         <span id="total-amount-display" class="text-4xl md:text-6xl font-bold text-yellow-400 drop-shadow-lg font-mono">
-                            Rp 154.250.000
+                            Rp 0
                         </span>
                         <button onclick="toggleEditMode()" class="absolute -right-8 top-2 opacity-0 group-hover:opacity-100 text-white/50 hover:text-white transition-opacity" title="Edit Total (Admin)">
                             <i data-lucide="edit-2" class="w-4 h-4"></i>
                         </button>
                     </div>
 
-                    <!-- Edit Mode (Hidden by default) -->
                     <div id="edit-mode" class="hidden flex items-center gap-2">
-                        <input type="number" id="total-input" class="text-slate-900 px-3 py-1 rounded text-2xl font-bold w-48 text-center outline-none" value="154250000">
+                        <input type="number" id="total-input" class="text-slate-900 px-3 py-1 rounded text-2xl font-bold w-48 text-center outline-none">
                         <button onclick="saveDonation()" class="bg-green-500 p-2 rounded hover:bg-green-600 text-white">
                             <i data-lucide="save" class="w-5 h-5"></i>
                         </button>
                     </div>
                 </div>
-                <p class="text-xs text-blue-200 mt-2">*Data diperbarui secara berkala (Real-time)</p>
+                <p class="text-xs text-blue-200 mt-2">*Data Real-time (Otomatis)</p>
             </div>
         </div>
     </header>
@@ -103,7 +272,6 @@
     <div class="bg-white shadow-lg rounded-xl mx-4 -mt-16 p-6 max-w-4xl md:mx-auto relative z-20 border border-slate-200">
         <div class="text-center">
             <h2 class="text-slate-500 text-sm font-semibold uppercase tracking-widest mb-4">Batas Akhir Donasi (Hari Ini 22:00 WIB)</h2>
-            
             <div id="timer-active" class="grid grid-cols-3 gap-4 max-w-md mx-auto">
                 <div class="bg-slate-900 text-white p-4 rounded-lg">
                     <span id="hours" class="block text-3xl md:text-5xl font-mono font-bold">00</span>
@@ -118,7 +286,6 @@
                     <span class="text-xs text-red-100">Detik</span>
                 </div>
             </div>
-
             <div id="timer-expired" class="hidden bg-red-50 text-red-700 p-6 rounded-lg border border-red-200">
                 <h3 class="text-2xl font-bold">Penggalangan Dana Ditutup</h3>
                 <p>Terima kasih atas partisipasi luar biasa Anda.</p>
@@ -129,7 +296,7 @@
     <!-- MAIN CONTENT -->
     <main class="flex-grow container mx-auto px-4 py-12 max-w-5xl">
 
-        <!-- STRATEGIC PLAN SECTION (NEW) -->
+        <!-- STRATEGIC PLAN SECTION -->
         <div class="mb-12 bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
             <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-50">
                 <div>
@@ -158,7 +325,7 @@
                             </tr>
                         </thead>
                         <tbody id="plan-table-body" class="divide-y divide-slate-100">
-                            <!-- Rows injected by JS -->
+                            <!-- Rows loaded via JS -->
                         </tbody>
                     </table>
                 </div>
@@ -166,9 +333,7 @@
 
             <!-- Edit Mode -->
             <div id="plan-edit" class="hidden p-4 bg-slate-50">
-                <div id="plan-edit-container" class="space-y-4">
-                    <!-- Edit rows injected by JS -->
-                </div>
+                <div id="plan-edit-container" class="space-y-4"></div>
                 <div class="mt-4 flex gap-2">
                     <button onclick="addPlanItem()" class="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded hover:bg-slate-100 text-sm font-medium flex items-center gap-2">
                         <i data-lucide="plus" class="w-4 h-4"></i> Tambah Kegiatan
@@ -181,11 +346,9 @@
         </div>
 
         <div class="grid md:grid-cols-2 gap-8">
-            
             <!-- LEFT COLUMN -->
             <div class="space-y-8">
-                
-                <!-- Input Message Form -->
+                <!-- Message Form -->
                 <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-sm">
                     <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3">
                         <i data-lucide="message-square" class="text-blue-600 w-5 h-5"></i>
@@ -198,11 +361,11 @@
                         </button>
                     </form>
                     <p id="msg-success" class="hidden text-xs text-green-600 mt-2 font-medium animate-pulse">
-                        ✓ Pesan berhasil ditayangkan di running text!
+                        ✓ Pesan berhasil dikirim ke database!
                     </p>
                 </div>
 
-                <!-- Gallery Section -->
+                <!-- Gallery (Static for now as images need storage bucket) -->
                 <div>
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -215,21 +378,17 @@
                             <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
                         </label>
                     </div>
-
-                    <div id="gallery-grid" class="grid grid-cols-2 gap-3 mb-4">
-                        <!-- Gallery Items Injected by JS -->
-                    </div>
+                    <div id="gallery-grid" class="grid grid-cols-2 gap-3 mb-4"></div>
                 </div>
             </div>
 
-            <!-- RIGHT COLUMN (Sticky) -->
+            <!-- RIGHT COLUMN -->
             <div class="md:sticky md:top-8 h-fit">
                 <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100">
                     <div class="text-center mb-6">
                         <p class="text-slate-500 text-sm mb-1">Salurkan bantuan melalui</p>
                         <h3 class="text-xl font-bold text-slate-800">Bank Negara Indonesia (BNI)</h3>
                     </div>
-
                     <div class="bg-slate-100 p-4 rounded-xl flex items-center justify-between mb-6 group hover:bg-slate-200 transition-colors">
                         <div class="text-left">
                             <span class="text-xs text-slate-500 uppercase font-semibold">Nomor Rekening</span>
@@ -240,11 +399,9 @@
                             <i id="check-icon" data-lucide="check-circle" class="w-6 h-6 text-green-500 hidden absolute top-2 left-2"></i>
                         </button>
                     </div>
-                    
                     <div id="copy-alert" class="hidden text-center text-green-600 text-sm font-medium mb-4 animate-bounce">
                         Nomor rekening berhasil disalin!
                     </div>
-
                     <div class="space-y-3">
                         <a href="https://wa.me/6285228029800?text=Halo,%20saya%20sudah%20transfer%20donasi%20untuk%20banjir%20Sumatera.%20Berikut%20buktinya:" target="_blank" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all transform hover:-translate-y-1 shadow-lg shadow-green-200 no-underline">
                             <i data-lucide="phone" class="w-5 h-5"></i>
@@ -256,7 +413,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </main>
 
@@ -268,85 +424,14 @@
         </div>
     </footer>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- UI LOGIC & EVENTS -->
     <script>
-        // --- 1. CONFIG & STATE ---
-        // Target: 6 Desember 2025, 22:00 WIB
+        // --- TIMER LOGIC ---
         const targetDate = new Date('2025-12-06T22:00:00+07:00').getTime();
-        
-        let state = {
-            totalDonation: 154250000,
-            messages: [
-                "Terima kasih Budi S. (Medan) - Rp 500.000",
-                "Terima kasih Hamba Allah (Padang) - Rp 1.000.000",
-                "Terima kasih Siti A. (Aceh) - Rp 250.000",
-                "Solidaritas Alumni Tambang - Rp 5.000.000",
-                "Terima kasih Rina W. (Jakarta) - Rp 300.000",
-                "Terima kasih Komunitas Peduli - Rp 1.500.000",
-                "Doa terbaik untuk saudara di Sumatera.",
-                "Semoga banjir segera surut."
-            ],
-            gallery: [
-                { id: 1, url: 'https://images.unsplash.com/photo-1547638375-ebf04735d792?auto=format&fit=crop&q=80&w=400', caption: 'Distribusi nasi bungkus di Medan', date: '5 Des 14:00' },
-                { id: 2, url: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&q=80&w=400', caption: 'Evakuasi warga Aceh Tenggara', date: '5 Des 16:30' },
-                { id: 3, url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=400', caption: 'Posko kesehatan Pesisir Selatan', date: '6 Des 09:00' }
-            ],
-            // Data Rencana Strategis
-            strategicPlan: [
-                { 
-                    id: 1, 
-                    activity: "Belanja Logistik (Di Jawa)", 
-                    status: "Sedang Berjalan", 
-                    statusColor: "bg-green-100 text-green-700",
-                    plan: "Sarden, Abon, Susu, Pakaian Dalam Baru", 
-                    actual: "Stop Beras/Air (Stok Cukup)", 
-                    next: "Packing & Timbang Kargo" 
-                },
-                { 
-                    id: 2, 
-                    activity: "Pengiriman Kargo Udara", 
-                    status: "Prioritas", 
-                    statusColor: "bg-red-100 text-red-700",
-                    plan: "Via Pesawat (JNE/Kargo) - Cepat", 
-                    actual: "Jalur Darat Putus, Laut Lama (7hr)", 
-                    next: "Tujuan: FISIP USK Banda Aceh" 
-                },
-                { 
-                    id: 3, 
-                    activity: "Pengadaan Tenda Pengungsi", 
-                    status: "Rencana", 
-                    statusColor: "bg-blue-100 text-blue-700",
-                    plan: "Cari Vendor Tenda Besar/Barak", 
-                    actual: "Warga Masih Tidur di Jalan", 
-                    next: "Negosiasi Vendor & Kirim" 
-                },
-                { 
-                    id: 4, 
-                    activity: "Paket Hygiene & Bayi", 
-                    status: "Sedang Berjalan", 
-                    statusColor: "bg-green-100 text-green-700",
-                    plan: "Popok, Pembalut, Sabun, Handuk", 
-                    actual: "Stok Toko Lokal Menipis", 
-                    next: "Distribusi ke Titik Banjir" 
-                }
-            ]
-        };
-
-        // --- 2. INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', () => {
-            renderMarquee();
-            renderGallery();
-            renderPlan(); // New render function
-            startTimer();
-            lucide.createIcons();
-        });
-
-        // --- 3. COUNTDOWN TIMER LOGIC ---
         function startTimer() {
             const timer = setInterval(() => {
                 const now = new Date().getTime();
                 const distance = targetDate - now;
-
                 if (distance < 0) {
                     clearInterval(timer);
                     document.getElementById('timer-active').classList.add('hidden');
@@ -355,7 +440,6 @@
                     const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
                     const s = Math.floor((distance % (1000 * 60)) / 1000);
-
                     document.getElementById('hours').innerText = String(h).padStart(2, '0');
                     document.getElementById('minutes').innerText = String(m).padStart(2, '0');
                     document.getElementById('seconds').innerText = String(s).padStart(2, '0');
@@ -363,75 +447,11 @@
             }, 1000);
         }
 
-        // --- 4. MARQUEE / RUNNING TEXT LOGIC ---
-        function renderMarquee() {
-            const container = document.getElementById('marquee-container');
-            const items = state.messages.map(msg => `
-                <span class="flex items-center gap-2 text-sm font-medium text-blue-200 mx-4">
-                    <i data-lucide="heart" class="w-4 h-4 text-red-500 fill-red-500"></i> ${msg}
-                </span>
-            `).join('');
-            
-            container.innerHTML = items + items;
-            lucide.createIcons();
-        }
-
-        function handleSendMessage(e) {
-            e.preventDefault();
-            const input = document.getElementById('msg-input');
-            const val = input.value.trim();
-            
-            if(val) {
-                state.messages.unshift(`Dukungan Baru: ${val}`);
-                renderMarquee();
-                input.value = '';
-                
-                const successMsg = document.getElementById('msg-success');
-                successMsg.classList.remove('hidden');
-                setTimeout(() => successMsg.classList.add('hidden'), 3000);
-            }
-        }
-
-        // --- 5. GALLERY LOGIC ---
-        function renderGallery() {
-            const grid = document.getElementById('gallery-grid');
-            grid.innerHTML = state.gallery.map(photo => `
-                <div class="relative group overflow-hidden rounded-lg border border-slate-200 shadow-sm aspect-video bg-gray-200">
-                    <img src="${photo.url}" alt="${photo.caption}" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                        <p class="text-white text-xs font-medium line-clamp-2">${photo.caption}</p>
-                        <p class="text-slate-300 text-[10px]">${photo.date}</p>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function handleImageUpload(e) {
-            const file = e.target.files[0];
-            const uploadText = document.getElementById('upload-text');
-            
-            if (file) {
-                uploadText.innerText = "Mengunggah...";
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const newPhoto = {
-                        id: Date.now(),
-                        url: reader.result,
-                        caption: 'Update Baru Lapangan',
-                        date: 'Baru saja'
-                    };
-                    state.gallery.unshift(newPhoto);
-                    renderGallery();
-                    uploadText.innerText = "Upload Bukti";
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        // --- 6. STRATEGIC PLAN LOGIC (NEW) ---
-        function renderPlan() {
+        // --- UI RENDER HELPERS ---
+        function renderPlanTable(planData) {
             const tbody = document.getElementById('plan-table-body');
-            tbody.innerHTML = state.strategicPlan.map(item => `
+            if(!planData) return;
+            tbody.innerHTML = planData.map(item => `
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="p-4 font-bold text-slate-800">${item.activity}</td>
                     <td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${item.statusColor}">${item.status}</span></td>
@@ -442,55 +462,90 @@
             `).join('');
         }
 
+        function renderGallery() {
+            // Static gallery for now - Images need Storage bucket logic which is complex for single file
+            const galleryData = [
+                { id: 1, url: 'https://images.unsplash.com/photo-1547638375-ebf04735d792?auto=format&fit=crop&q=80&w=400', caption: 'Distribusi nasi bungkus di Medan', date: '5 Des 14:00' },
+                { id: 2, url: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&q=80&w=400', caption: 'Evakuasi warga Aceh Tenggara', date: '5 Des 16:30' },
+                { id: 3, url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=400', caption: 'Posko kesehatan Pesisir Selatan', date: '6 Des 09:00' }
+            ];
+            const grid = document.getElementById('gallery-grid');
+            grid.innerHTML = galleryData.map(photo => `
+                <div class="relative group overflow-hidden rounded-lg border border-slate-200 shadow-sm aspect-video bg-gray-200">
+                    <img src="${photo.url}" alt="${photo.caption}" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                        <p class="text-white text-xs font-medium line-clamp-2">${photo.caption}</p>
+                        <p class="text-slate-300 text-[10px]">${photo.date}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- INTERACTION HANDLERS (Connect to Window Functions) ---
+        function handleSendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('msg-input');
+            const val = input.value.trim();
+            if(val) {
+                // Call global backend function
+                window.saveMessageToBackend(`Dukungan Baru: ${val}`);
+                input.value = '';
+                const successMsg = document.getElementById('msg-success');
+                successMsg.classList.remove('hidden');
+                setTimeout(() => successMsg.classList.add('hidden'), 3000);
+            }
+        }
+
+        function toggleEditMode() {
+            document.getElementById('display-mode').classList.add('hidden');
+            document.getElementById('edit-mode').classList.remove('hidden');
+        }
+
+        function saveDonation() {
+            const inputVal = document.getElementById('total-input').value;
+            // Call global backend function
+            window.saveDonationToBackend(inputVal);
+            document.getElementById('display-mode').classList.remove('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
+        }
+
+        // --- PLAN EDIT LOGIC ---
         function togglePlanEdit() {
             const view = document.getElementById('plan-view');
             const edit = document.getElementById('plan-edit');
-            
             if(edit.classList.contains('hidden')) {
-                // Switch to Edit Mode
                 view.classList.add('hidden');
                 edit.classList.remove('hidden');
                 renderPlanEditInputs();
             } else {
-                // Cancel/Close Edit Mode
                 view.classList.remove('hidden');
                 edit.classList.add('hidden');
             }
         }
 
         function renderPlanEditInputs() {
+            const plan = window.appState ? window.appState.strategicPlan : [];
             const container = document.getElementById('plan-edit-container');
-            container.innerHTML = state.strategicPlan.map((item, index) => `
+            container.innerHTML = plan.map((item, index) => `
                 <div class="bg-white p-4 rounded border border-slate-200 shadow-sm relative group">
-                    <button onclick="deletePlanItem(${index})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 p-1" title="Hapus">
+                    <button onclick="deletePlanItem(${index})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 p-1">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <input type="hidden" id="edit-id-${index}" value="${item.id}">
+                        <div><label class="text-xs font-bold text-slate-400">KEGIATAN</label><input type="text" value="${item.activity}" id="edit-activity-${index}" class="w-full text-sm border-b py-1 font-bold"></div>
                         <div>
-                            <label class="text-xs text-slate-400 font-bold uppercase">Kegiatan</label>
-                            <input type="text" value="${item.activity}" id="edit-activity-${index}" class="w-full text-sm border-b border-slate-300 focus:border-blue-500 outline-none py-1 font-bold">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 font-bold uppercase">Status</label>
-                            <select id="edit-status-${index}" class="w-full text-sm border-b border-slate-300 focus:border-blue-500 outline-none py-1 bg-transparent">
+                            <label class="text-xs font-bold text-slate-400">STATUS</label>
+                            <select id="edit-status-${index}" class="w-full text-sm border-b py-1">
                                 <option value="Sedang Berjalan" ${item.status === 'Sedang Berjalan' ? 'selected' : ''}>Sedang Berjalan</option>
                                 <option value="Prioritas" ${item.status === 'Prioritas' ? 'selected' : ''}>Prioritas</option>
                                 <option value="Rencana" ${item.status === 'Rencana' ? 'selected' : ''}>Rencana</option>
                                 <option value="Selesai" ${item.status === 'Selesai' ? 'selected' : ''}>Selesai</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="text-xs text-slate-400 font-bold uppercase">Rencana</label>
-                            <input type="text" value="${item.plan}" id="edit-plan-${index}" class="w-full text-sm border-b border-slate-300 focus:border-blue-500 outline-none py-1">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 font-bold uppercase">Aktual</label>
-                            <input type="text" value="${item.actual}" id="edit-actual-${index}" class="w-full text-sm border-b border-slate-300 focus:border-blue-500 outline-none py-1">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-400 font-bold uppercase">Next Step</label>
-                            <input type="text" value="${item.next}" id="edit-next-${index}" class="w-full text-sm border-b border-slate-300 focus:border-blue-500 outline-none py-1 text-blue-600">
-                        </div>
+                        <div><label class="text-xs font-bold text-slate-400">RENCANA</label><input type="text" value="${item.plan}" id="edit-plan-${index}" class="w-full text-sm border-b py-1"></div>
+                        <div><label class="text-xs font-bold text-slate-400">AKTUAL</label><input type="text" value="${item.actual}" id="edit-actual-${index}" class="w-full text-sm border-b py-1"></div>
+                        <div><label class="text-xs font-bold text-slate-400">NEXT</label><input type="text" value="${item.next}" id="edit-next-${index}" class="w-full text-sm border-b py-1 text-blue-600"></div>
                     </div>
                 </div>
             `).join('');
@@ -498,37 +553,33 @@
         }
 
         function addPlanItem() {
-            state.strategicPlan.push({
-                id: Date.now(),
-                activity: "Kegiatan Baru",
-                status: "Rencana",
-                statusColor: "bg-gray-100 text-gray-700",
-                plan: "-",
-                actual: "-",
-                next: "-"
-            });
+            let currentPlan = window.appState.strategicPlan;
+            currentPlan.push({ id: Date.now(), activity: "Kegiatan Baru", status: "Rencana", statusColor: "bg-gray-100", plan: "-", actual: "-", next: "-" });
+            window.appState.strategicPlan = currentPlan;
             renderPlanEditInputs();
         }
 
         function deletePlanItem(index) {
-            if(confirm('Hapus kegiatan ini?')) {
-                state.strategicPlan.splice(index, 1);
+            if(confirm('Hapus item ini?')) {
+                let currentPlan = window.appState.strategicPlan;
+                currentPlan.splice(index, 1);
+                window.appState.strategicPlan = currentPlan;
                 renderPlanEditInputs();
             }
         }
 
         function savePlan() {
-            // Collect data from inputs
-            state.strategicPlan = state.strategicPlan.map((item, index) => {
+            let currentPlan = window.appState.strategicPlan;
+            const newPlan = currentPlan.map((item, index) => {
                 const status = document.getElementById(`edit-status-${index}`).value;
                 let color = "bg-gray-100 text-gray-700";
                 if(status === 'Sedang Berjalan') color = "bg-green-100 text-green-700";
                 if(status === 'Prioritas') color = "bg-red-100 text-red-700";
                 if(status === 'Rencana') color = "bg-blue-100 text-blue-700";
                 if(status === 'Selesai') color = "bg-slate-200 text-slate-500 line-through";
-
+                
                 return {
-                    id: item.id,
+                    id: item.id || Date.now(),
                     activity: document.getElementById(`edit-activity-${index}`).value,
                     status: status,
                     statusColor: color,
@@ -537,50 +588,23 @@
                     next: document.getElementById(`edit-next-${index}`).value
                 };
             });
-
-            renderPlan();
-            togglePlanEdit(); // Close edit mode
-        }
-
-        // --- 7. DONATION EDIT LOGIC ---
-        function formatRupiah(number) {
-            return new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            }).format(number);
-        }
-
-        function toggleEditMode() {
-            document.getElementById('display-mode').classList.add('hidden');
-            document.getElementById('edit-mode').classList.remove('hidden');
-            document.getElementById('total-input').focus();
-        }
-
-        function saveDonation() {
-            const inputVal = document.getElementById('total-input').value;
-            state.totalDonation = Number(inputVal);
             
-            document.getElementById('total-amount-display').innerText = formatRupiah(state.totalDonation);
-            
-            document.getElementById('display-mode').classList.remove('hidden');
-            document.getElementById('edit-mode').classList.add('hidden');
+            window.savePlanToBackend(newPlan);
+            togglePlanEdit();
         }
 
-        // --- 8. UTILS (COPY) ---
+        function handleImageUpload(e) {
+            alert("Upload foto membutuhkan Cloud Storage Bucket (Backend Lanjutan). Saat ini hanya simulasi frontend.");
+        }
+
         function copyRekening() {
             navigator.clipboard.writeText('1342645761');
-            
             const copyIcon = document.getElementById('copy-icon');
             const checkIcon = document.getElementById('check-icon');
             const alert = document.getElementById('copy-alert');
-
-            // Toggle icons
             copyIcon.classList.add('hidden');
             checkIcon.classList.remove('hidden');
             alert.classList.remove('hidden');
-
             setTimeout(() => {
                 copyIcon.classList.remove('hidden');
                 checkIcon.classList.add('hidden');
@@ -588,6 +612,12 @@
             }, 2000);
         }
 
+        // Init Static
+        document.addEventListener('DOMContentLoaded', () => {
+            renderGallery();
+            startTimer();
+            lucide.createIcons();
+        });
     </script>
 </body>
 </html>
