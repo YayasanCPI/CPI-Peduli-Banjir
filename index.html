@@ -1,258 +1,398 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Copy, Phone, Heart, AlertTriangle, CheckCircle, ArrowRight, Send, MessageSquare } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aksi Solidaritas Banjir Sumatera</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-const FloodReliefApp = () => {
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
-  const [isExpired, setIsExpired] = useState(false);
-  const [copied, setCopied] = useState(false);
-  
-  // State untuk Input Pesan
-  const [inputMessage, setInputMessage] = useState("");
-  const [isMessageSent, setIsMessageSent] = useState(false);
+    <!-- Custom Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 
-  // Data awal running text
-  const [messages, setMessages] = useState([
-    "Terima kasih Budi S. (Medan) - Rp 500.000",
-    "Terima kasih Hamba Allah (Padang) - Rp 1.000.000",
-    "Terima kasih Siti A. (Aceh) - Rp 250.000",
-    "Solidaritas Alumni Tambang - Rp 5.000.000",
-    "Terima kasih Rina W. (Jakarta) - Rp 300.000",
-    "Terima kasih Komunitas Peduli - Rp 1.500.000",
-    "Doa terbaik untuk saudara di Sumatera.",
-    "Semoga banjir segera surut."
-  ]);
-
-  // Target: Hari ini, 6 Desember 2025, Pukul 22:00 WIB
-  const targetDate = new Date('2025-12-06T22:00:00+07:00').getTime();
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const distance = targetDate - now;
-
-      if (distance < 0) {
-        clearInterval(interval);
-        setIsExpired(true);
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
-      } else {
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-        setTimeLeft({ hours, minutes, seconds });
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText('1342645761');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
-    if (inputMessage.trim()) {
-      // Tambahkan pesan baru ke awal list
-      const newItem = `Dukungan Baru: ${inputMessage}`;
-      setMessages([newItem, ...messages]); 
-      
-      setInputMessage("");
-      setIsMessageSent(true);
-      setTimeout(() => setIsMessageSent(false), 3000);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
-      
-      {/* Running Text Section */}
-      <div className="bg-slate-900 text-white py-2 overflow-hidden relative z-20 shadow-md">
-        <div className="whitespace-nowrap animate-marquee flex items-center gap-8">
-          {messages.map((msg, idx) => (
-            <span key={idx} className="flex items-center gap-2 text-sm font-medium text-blue-200">
-              <Heart size={14} className="text-red-500 fill-red-500" /> {msg}
-            </span>
-          ))}
-           {/* Duplicate for seamless loop */}
-           {messages.map((msg, idx) => (
-            <span key={`dup-${idx}`} className="flex items-center gap-2 text-sm font-medium text-blue-200">
-              <Heart size={14} className="text-red-500 fill-red-500" /> {msg}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Hero Section */}
-      <header className="bg-gradient-to-br from-blue-700 to-slate-800 text-white py-12 px-4 text-center relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('https://www.transparenttextures.com/patterns/rain.png')]"></div>
-        <div className="max-w-3xl mx-auto relative z-10">
-          <div className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 animate-pulse">
-            <AlertTriangle size={14} /> Darurat Bencana
-          </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold mb-4 leading-tight">
-            Aksi Solidaritas Banjir Sumatera
-          </h1>
-          <p className="text-blue-100 text-lg md:text-xl mb-6 max-w-2xl mx-auto">
-            Bantu saudara kita di Aceh, Sumatera Utara, dan Sumatera Barat yang terdampak banjir bandang 26 November lalu.
-          </p>
-        </div>
-      </header>
-
-      {/* Countdown Timer Section */}
-      <div className="bg-white shadow-lg rounded-xl mx-4 -mt-10 p-6 max-w-4xl md:mx-auto relative z-20 border border-slate-200">
-        <div className="text-center">
-          <h2 className="text-slate-500 text-sm font-semibold uppercase tracking-widest mb-4">Batas Akhir Donasi (Hari Ini 22:00 WIB)</h2>
-          
-          {isExpired ? (
-            <div className="bg-red-50 text-red-700 p-6 rounded-lg border border-red-200">
-              <h3 className="text-2xl font-bold">Penggalangan Dana Ditutup</h3>
-              <p>Terima kasih atas partisipasi luar biasa Anda.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-              <div className="bg-slate-900 text-white p-4 rounded-lg">
-                <span className="block text-3xl md:text-5xl font-mono font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
-                <span className="text-xs text-slate-400">Jam</span>
-              </div>
-              <div className="bg-slate-900 text-white p-4 rounded-lg">
-                <span className="block text-3xl md:text-5xl font-mono font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
-                <span className="text-xs text-slate-400">Menit</span>
-              </div>
-              <div className="bg-red-600 text-white p-4 rounded-lg shadow-lg shadow-red-200 animate-pulse">
-                <span className="block text-3xl md:text-5xl font-mono font-bold">{String(timeLeft.seconds).padStart(2, '0')}</span>
-                <span className="text-xs text-red-100">Detik</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Donation Details & Action */}
-      <main className="flex-grow container mx-auto px-4 py-12 max-w-4xl">
-        <div className="grid md:grid-cols-2 gap-8">
-          
-          {/* Left: Data & Input Form */}
-          <div className="space-y-6">
-            
-            {/* Input Form Section */}
-            <div className="bg-white p-5 rounded-xl border border-blue-100 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3">
-                <MessageSquare size={20} className="text-blue-600"/>
-                Kirim Pesan Semangat
-              </h3>
-              <form onSubmit={handleSendMessage} className="relative">
-                <input 
-                  type="text" 
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder="Tulis doa atau dukunganmu di sini..." 
-                  className="w-full pl-4 pr-12 py-3 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none text-sm"
-                  maxLength={60}
-                />
-                <button 
-                  type="submit"
-                  disabled={!inputMessage.trim()}
-                  className="absolute right-2 top-2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send size={16} />
-                </button>
-              </form>
-              {isMessageSent && (
-                <p className="text-xs text-green-600 mt-2 font-medium animate-pulse">
-                  ✓ Pesan berhasil ditayangkan di running text!
-                </p>
-              )}
-              <p className="text-xs text-slate-400 mt-2">
-                *Pesanmu akan muncul otomatis di baris atas.
-              </p>
-            </div>
-
-            <div className="pt-4">
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-3">
-                <span className="bg-blue-100 text-blue-700 p-2 rounded-lg"><CheckCircle size={20}/></span>
-                Transparansi Data
-              </h3>
-              <p className="text-slate-600 leading-relaxed text-sm">
-                Donasi dialokasikan untuk kebutuhan mendesak: makanan siap saji, selimut, air bersih, dan obat-obatan.
-              </p>
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mt-3">
-                <h4 className="font-semibold text-blue-800 mb-2 text-sm">Area Fokus Distribusi:</h4>
-                <ul className="list-disc list-inside text-slate-700 space-y-1 text-sm">
-                  <li>Kabupaten Aceh Tenggara (Aceh)</li>
-                  <li>Deli Serdang & Medan (Sumut)</li>
-                  <li>Pesisir Selatan (Sumbar)</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Transfer Box */}
-          <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100">
-            <div className="text-center mb-6">
-              <p className="text-slate-500 text-sm mb-1">Salurkan bantuan melalui</p>
-              <h3 className="text-xl font-bold text-slate-800">Bank Negara Indonesia (BNI)</h3>
-            </div>
-
-            <div className="bg-slate-100 p-4 rounded-xl flex items-center justify-between mb-6 group hover:bg-slate-200 transition-colors">
-              <div className="text-left">
-                <span className="text-xs text-slate-500 uppercase font-semibold">Nomor Rekening</span>
-                <p className="text-2xl font-mono font-bold text-slate-900 tracking-wider">1342645761</p>
-              </div>
-              <button 
-                onClick={handleCopy}
-                className="bg-white p-2 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all text-blue-600"
-                title="Salin Nomor"
-              >
-                {copied ? <CheckCircle size={24} className="text-green-500"/> : <Copy size={24}/>}
-              </button>
-            </div>
-
-            {copied && (
-              <div className="text-center text-green-600 text-sm font-medium mb-4 animate-bounce">
-                Nomor rekening berhasil disalin!
-              </div>
-            )}
-
-            <div className="space-y-3">
-              <a 
-                href="https://wa.me/6285228029800?text=Halo,%20saya%20sudah%20transfer%20donasi%20untuk%20banjir%20Sumatera.%20Berikut%20buktinya:"
-                target="_blank"
-                rel="noreferrer"
-                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all transform hover:-translate-y-1 shadow-lg shadow-green-200"
-              >
-                <Phone size={20} />
-                Konfirmasi Transfer (WhatsApp)
-              </a>
-              <p className="text-center text-xs text-slate-400">
-                Wajib konfirmasi ke +62 852-2802-9800 setelah transfer.
-              </p>
-            </div>
-          </div>
-
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-8 text-center border-t border-slate-800">
-        <div className="container mx-auto px-4">
-          <p className="mb-2">Posko Bersama Peduli Sumatera</p>
-          <p className="text-xs">&copy; 2025 Solidaritas Kemanusiaan. Batas akhir: 6 Des 2025, 22:00 WIB.</p>
-        </div>
-      </footer>
-
-      <style>{`
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
         @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
         }
         .animate-marquee {
-          animation: marquee 30s linear infinite;
+            display: flex;
+            animation: marquee 40s linear infinite;
         }
-      `}</style>
-    </div>
-  );
-};
+        
+        /* Custom Scrollbar for better UX */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
 
-export default FloodReliefApp;
+    <!-- RUNNING TEXT SECTION -->
+    <div class="bg-slate-900 text-white py-2 overflow-hidden relative z-20 shadow-md">
+        <div id="marquee-container" class="animate-marquee items-center gap-8 whitespace-nowrap pl-4">
+            <!-- Content will be injected by JS -->
+        </div>
+    </div>
+
+    <!-- HERO SECTION -->
+    <header class="bg-gradient-to-br from-blue-700 to-slate-800 text-white pt-6 pb-24 px-4 relative overflow-hidden">
+        <!-- Background Pattern -->
+        <div class="absolute top-0 left-0 w-full h-full opacity-10" style="background-image: url('https://www.transparenttextures.com/patterns/rain.png');"></div>
+        
+        <div class="max-w-4xl mx-auto relative z-10">
+            <div class="flex items-center gap-4 mb-8">
+                <img src="https://i.ibb.co.com/KxWySDqp/logo-cpi.png" alt="Logo Yayasan Cakrawala Peduli Indonesia" class="w-16 h-16 rounded-full shadow-lg">
+                <div>
+                    <h2 class="text-xl md:text-2xl font-bold text-white">Yayasan Cakrawala Peduli Indonesia</h2>
+                    <p class="text-blue-200 text-sm">Aksi Solidaritas Kemanusiaan</p>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <div class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 animate-pulse">
+                    <i data-lucide="alert-triangle" class="w-4 h-4"></i> Darurat Bencana
+                </div>
+                <h1 class="text-3xl md:text-5xl font-extrabold mb-4 leading-tight">
+                    Aksi Solidaritas Banjir Sumatera
+                </h1>
+                <p class="text-blue-100 text-lg md:text-xl mb-8 max-w-2xl mx-auto">
+                    Bantu saudara kita di Aceh, Sumatera Utara, dan Sumatera Barat.
+                </p>
+            </div>
+
+            <!-- TOTAL DONATION CARD -->
+            <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl max-w-lg mx-auto transform hover:scale-105 transition-transform duration-300">
+                <div class="flex items-center justify-center gap-2 mb-2 text-blue-200 text-sm font-semibold uppercase tracking-widest">
+                    <i data-lucide="trending-up" class="w-4 h-4"></i> Total Donasi Terkumpul
+                </div>
+                
+                <div class="flex items-center justify-center gap-3">
+                    <!-- Display Mode -->
+                    <div id="display-mode" class="relative group">
+                        <span id="total-amount-display" class="text-4xl md:text-6xl font-bold text-yellow-400 drop-shadow-lg font-mono">
+                            Rp 154.250.000
+                        </span>
+                        <button onclick="toggleEditMode()" class="absolute -right-8 top-2 opacity-0 group-hover:opacity-100 text-white/50 hover:text-white transition-opacity" title="Edit Total (Admin)">
+                            <i data-lucide="edit-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Edit Mode (Hidden by default) -->
+                    <div id="edit-mode" class="hidden flex items-center gap-2">
+                        <input type="number" id="total-input" class="text-slate-900 px-3 py-1 rounded text-2xl font-bold w-48 text-center outline-none" value="154250000">
+                        <button onclick="saveDonation()" class="bg-green-500 p-2 rounded hover:bg-green-600 text-white">
+                            <i data-lucide="save" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+                <p class="text-xs text-blue-200 mt-2">*Data diperbarui secara berkala (Real-time)</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- COUNTDOWN SECTION -->
+    <div class="bg-white shadow-lg rounded-xl mx-4 -mt-16 p-6 max-w-4xl md:mx-auto relative z-20 border border-slate-200">
+        <div class="text-center">
+            <h2 class="text-slate-500 text-sm font-semibold uppercase tracking-widest mb-4">Batas Akhir Donasi (Hari Ini 22:00 WIB)</h2>
+            
+            <div id="timer-active" class="grid grid-cols-3 gap-4 max-w-md mx-auto">
+                <div class="bg-slate-900 text-white p-4 rounded-lg">
+                    <span id="hours" class="block text-3xl md:text-5xl font-mono font-bold">00</span>
+                    <span class="text-xs text-slate-400">Jam</span>
+                </div>
+                <div class="bg-slate-900 text-white p-4 rounded-lg">
+                    <span id="minutes" class="block text-3xl md:text-5xl font-mono font-bold">00</span>
+                    <span class="text-xs text-slate-400">Menit</span>
+                </div>
+                <div class="bg-red-600 text-white p-4 rounded-lg shadow-lg shadow-red-200 animate-pulse">
+                    <span id="seconds" class="block text-3xl md:text-5xl font-mono font-bold">00</span>
+                    <span class="text-xs text-red-100">Detik</span>
+                </div>
+            </div>
+
+            <div id="timer-expired" class="hidden bg-red-50 text-red-700 p-6 rounded-lg border border-red-200">
+                <h3 class="text-2xl font-bold">Penggalangan Dana Ditutup</h3>
+                <p>Terima kasih atas partisipasi luar biasa Anda.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow container mx-auto px-4 py-12 max-w-4xl">
+        <div class="grid md:grid-cols-2 gap-8">
+            
+            <!-- LEFT COLUMN -->
+            <div class="space-y-8">
+                
+                <!-- Input Message Form -->
+                <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-sm">
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3">
+                        <i data-lucide="message-square" class="text-blue-600 w-5 h-5"></i>
+                        Kirim Pesan Semangat
+                    </h3>
+                    <form onsubmit="handleSendMessage(event)" class="relative">
+                        <input type="text" id="msg-input" placeholder="Tulis doa atau dukunganmu di sini..." class="w-full pl-4 pr-12 py-3 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none text-sm" maxlength="60" required>
+                        <button type="submit" class="absolute right-2 top-2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                        </button>
+                    </form>
+                    <p id="msg-success" class="hidden text-xs text-green-600 mt-2 font-medium animate-pulse">
+                        ✓ Pesan berhasil ditayangkan di running text!
+                    </p>
+                </div>
+
+                <!-- Gallery Section -->
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <span class="bg-blue-100 text-blue-700 p-2 rounded-lg"><i data-lucide="camera" class="w-5 h-5"></i></span>
+                            Bukti Kegiatan
+                        </h3>
+                        <label class="cursor-pointer bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-700 transition flex items-center gap-2">
+                            <i data-lucide="upload" class="w-3 h-3"></i>
+                            <span id="upload-text">Upload Bukti</span>
+                            <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                        </label>
+                    </div>
+
+                    <div id="gallery-grid" class="grid grid-cols-2 gap-3 mb-4">
+                        <!-- Gallery Items Injected by JS -->
+                    </div>
+
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <h4 class="font-semibold text-blue-800 mb-2 text-sm">Fokus Penyaluran:</h4>
+                        <ul class="list-disc list-inside text-slate-700 space-y-1 text-sm">
+                            <li>Logistik Makanan (Dapur Umum)</li>
+                            <li>Evakuasi & P3K</li>
+                            <li>Pembersihan Lumpur Pasca Banjir</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN (Sticky) -->
+            <div class="md:sticky md:top-8 h-fit">
+                <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100">
+                    <div class="text-center mb-6">
+                        <p class="text-slate-500 text-sm mb-1">Salurkan bantuan melalui</p>
+                        <h3 class="text-xl font-bold text-slate-800">Bank Negara Indonesia (BNI)</h3>
+                    </div>
+
+                    <div class="bg-slate-100 p-4 rounded-xl flex items-center justify-between mb-6 group hover:bg-slate-200 transition-colors">
+                        <div class="text-left">
+                            <span class="text-xs text-slate-500 uppercase font-semibold">Nomor Rekening</span>
+                            <p class="text-2xl font-mono font-bold text-slate-900 tracking-wider">1342645761</p>
+                        </div>
+                        <button onclick="copyRekening()" class="bg-white p-2 rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all text-blue-600 relative" title="Salin Nomor">
+                            <i id="copy-icon" data-lucide="copy" class="w-6 h-6"></i>
+                            <i id="check-icon" data-lucide="check-circle" class="w-6 h-6 text-green-500 hidden absolute top-2 left-2"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="copy-alert" class="hidden text-center text-green-600 text-sm font-medium mb-4 animate-bounce">
+                        Nomor rekening berhasil disalin!
+                    </div>
+
+                    <div class="space-y-3">
+                        <a href="https://wa.me/6285228029800?text=Halo,%20saya%20sudah%20transfer%20donasi%20untuk%20banjir%20Sumatera.%20Berikut%20buktinya:" target="_blank" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all transform hover:-translate-y-1 shadow-lg shadow-green-200 no-underline">
+                            <i data-lucide="phone" class="w-5 h-5"></i>
+                            Konfirmasi Transfer (WhatsApp)
+                        </a>
+                        <p class="text-center text-xs text-slate-400">
+                            Wajib konfirmasi ke +62 852-2802-9800 setelah transfer.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-900 text-slate-400 py-8 text-center border-t border-slate-800 mt-auto">
+        <div class="container mx-auto px-4">
+            <p class="mb-2">Posko Bersama Peduli Sumatera</p>
+            <p class="text-xs">&copy; 2025 Solidaritas Kemanusiaan. Batas akhir: 6 Des 2025, 22:00 WIB.</p>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- 1. CONFIG & STATE ---
+        // Target: 6 Desember 2025, 22:00 WIB
+        const targetDate = new Date('2025-12-06T22:00:00+07:00').getTime();
+        
+        let state = {
+            totalDonation: 154250000,
+            messages: [
+                "Terima kasih Budi S. (Medan) - Rp 500.000",
+                "Terima kasih Hamba Allah (Padang) - Rp 1.000.000",
+                "Terima kasih Siti A. (Aceh) - Rp 250.000",
+                "Solidaritas Alumni Tambang - Rp 5.000.000",
+                "Terima kasih Rina W. (Jakarta) - Rp 300.000",
+                "Terima kasih Komunitas Peduli - Rp 1.500.000",
+                "Doa terbaik untuk saudara di Sumatera.",
+                "Semoga banjir segera surut."
+            ],
+            gallery: [
+                { id: 1, url: 'https://images.unsplash.com/photo-1547638375-ebf04735d792?auto=format&fit=crop&q=80&w=400', caption: 'Distribusi nasi bungkus di Medan', date: '5 Des 14:00' },
+                { id: 2, url: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&q=80&w=400', caption: 'Evakuasi warga Aceh Tenggara', date: '5 Des 16:30' },
+                { id: 3, url: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=400', caption: 'Posko kesehatan Pesisir Selatan', date: '6 Des 09:00' }
+            ]
+        };
+
+        // --- 2. INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderMarquee();
+            renderGallery();
+            startTimer();
+            lucide.createIcons(); // Initialize icons
+        });
+
+        // --- 3. COUNTDOWN TIMER LOGIC ---
+        function startTimer() {
+            const timer = setInterval(() => {
+                const now = new Date().getTime();
+                const distance = targetDate - now;
+
+                if (distance < 0) {
+                    clearInterval(timer);
+                    document.getElementById('timer-active').classList.add('hidden');
+                    document.getElementById('timer-expired').classList.remove('hidden');
+                } else {
+                    const h = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                    const s = Math.floor((distance % (1000 * 60)) / 1000);
+
+                    document.getElementById('hours').innerText = String(h).padStart(2, '0');
+                    document.getElementById('minutes').innerText = String(m).padStart(2, '0');
+                    document.getElementById('seconds').innerText = String(s).padStart(2, '0');
+                }
+            }, 1000);
+        }
+
+        // --- 4. MARQUEE / RUNNING TEXT LOGIC ---
+        function renderMarquee() {
+            const container = document.getElementById('marquee-container');
+            const items = state.messages.map(msg => `
+                <span class="flex items-center gap-2 text-sm font-medium text-blue-200 mx-4">
+                    <i data-lucide="heart" class="w-4 h-4 text-red-500 fill-red-500"></i> ${msg}
+                </span>
+            `).join('');
+            
+            // Repeat content to ensure smooth loop
+            container.innerHTML = items + items;
+            lucide.createIcons(); // Re-init icons for injected HTML
+        }
+
+        function handleSendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('msg-input');
+            const val = input.value.trim();
+            
+            if(val) {
+                state.messages.unshift(`Dukungan Baru: ${val}`);
+                renderMarquee(); // Re-render marquee with new message
+                input.value = '';
+                
+                // Show success feedback
+                const successMsg = document.getElementById('msg-success');
+                successMsg.classList.remove('hidden');
+                setTimeout(() => successMsg.classList.add('hidden'), 3000);
+            }
+        }
+
+        // --- 5. GALLERY LOGIC ---
+        function renderGallery() {
+            const grid = document.getElementById('gallery-grid');
+            grid.innerHTML = state.gallery.map(photo => `
+                <div class="relative group overflow-hidden rounded-lg border border-slate-200 shadow-sm aspect-video bg-gray-200">
+                    <img src="${photo.url}" alt="${photo.caption}" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                        <p class="text-white text-xs font-medium line-clamp-2">${photo.caption}</p>
+                        <p class="text-slate-300 text-[10px]">${photo.date}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            const uploadText = document.getElementById('upload-text');
+            
+            if (file) {
+                uploadText.innerText = "Mengunggah...";
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const newPhoto = {
+                        id: Date.now(),
+                        url: reader.result,
+                        caption: 'Update Baru Lapangan',
+                        date: 'Baru saja'
+                    };
+                    state.gallery.unshift(newPhoto);
+                    renderGallery();
+                    uploadText.innerText = "Upload Bukti";
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // --- 6. DONATION EDIT LOGIC ---
+        function formatRupiah(number) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(number);
+        }
+
+        function toggleEditMode() {
+            document.getElementById('display-mode').classList.add('hidden');
+            document.getElementById('edit-mode').classList.remove('hidden');
+            document.getElementById('total-input').focus();
+        }
+
+        function saveDonation() {
+            const inputVal = document.getElementById('total-input').value;
+            state.totalDonation = Number(inputVal);
+            
+            document.getElementById('total-amount-display').innerText = formatRupiah(state.totalDonation);
+            
+            document.getElementById('display-mode').classList.remove('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
+        }
+
+        // --- 7. UTILS (COPY) ---
+        function copyRekening() {
+            navigator.clipboard.writeText('1342645761');
+            
+            const copyIcon = document.getElementById('copy-icon');
+            const checkIcon = document.getElementById('check-icon');
+            const alert = document.getElementById('copy-alert');
+
+            // Toggle icons
+            copyIcon.classList.add('hidden');
+            checkIcon.classList.remove('hidden');
+            alert.classList.remove('hidden');
+
+            setTimeout(() => {
+                copyIcon.classList.remove('hidden');
+                checkIcon.classList.add('hidden');
+                alert.classList.add('hidden');
+            }, 2000);
+        }
+
+    </script>
+</body>
+</html>
