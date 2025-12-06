@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aksi Solidaritas Banjir Sumatera</title>
+    <title>Aksi Solidaritas Banjir Sumatera - Laporan Transparansi</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -35,11 +35,8 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
                 await signInAnonymously(auth);
-                
-                // Menggunakan ID dokumen yang sama agar data konsisten
                 docRef = doc(db, 'campaigns', 'sumatera_2025');
                 setupRealtimeListener();
-
             } catch (e) {
                 console.warn("Mode Offline aktif.", e);
                 useLocalStorage = true;
@@ -66,10 +63,14 @@
                 strategicPlan: [
                     { id: 1, activity: "Belanja Logistik", status: "Sedang Berjalan", statusColor: "bg-green-100 text-green-700", plan: "Sarden & Abon", actual: "Beras Cukup", next: "Packing" }
                 ],
-                // Data Galeri Awal
+                // Data Alokasi Dana (Baru)
+                fundAllocation: [
+                    { id: 1, category: "Pangan Siap Saji", description: "Sarden, Abon, Susu (Beli di Jawa)", amount: 60000000 },
+                    { id: 2, category: "Sandang & Hygiene", description: "Pakaian Dalam, Pembalut, Popok", amount: 40000000 },
+                    { id: 3, category: "Logistik Kargo", description: "Biaya Pesawat Jakarta-Aceh", amount: 20000000 }
+                ],
                 gallery: [
-                   { id: 1, url: 'https://images.unsplash.com/photo-1547638375-ebf04735d792?w=400', caption: 'Dapur Umum', date: '5 Des' },
-                   { id: 2, url: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=400', caption: 'Evakuasi', date: '5 Des' }
+                   { id: 1, url: 'https://images.unsplash.com/photo-1547638375-ebf04735d792?w=400', caption: 'Dapur Umum', date: '5 Des' }
                 ]
             };
             
@@ -99,27 +100,21 @@
             else updateLocalData('strategicPlan', newPlan);
         };
 
-        // --- FUNGSI GALERI BARU (SIMPAN & HAPUS) ---
+        window.saveFundToBackend = async (newFund) => {
+            if (!useLocalStorage) await updateDoc(docRef, { fundAllocation: newFund });
+            else updateLocalData('fundAllocation', newFund);
+        };
+
         window.saveImageToBackend = async (newImageObj) => {
-            if (!useLocalStorage) {
-                await updateDoc(docRef, { gallery: arrayUnion(newImageObj) });
-            } else {
-                let data = getLocal(); 
-                data.gallery = data.gallery || []; 
-                data.gallery.unshift(newImageObj); 
-                saveLocal(data);
-            }
+            if (!useLocalStorage) await updateDoc(docRef, { gallery: arrayUnion(newImageObj) });
+            else { let data = getLocal(); data.gallery = data.gallery || []; data.gallery.unshift(newImageObj); saveLocal(data); }
         };
 
         window.deleteGalleryItemBackend = async (id) => {
             const currentGallery = window.appState.gallery || [];
             const newGallery = currentGallery.filter(item => item.id !== id);
-            
-            if (!useLocalStorage) {
-                await updateDoc(docRef, { gallery: newGallery });
-            } else {
-                updateLocalData('gallery', newGallery);
-            }
+            if (!useLocalStorage) await updateDoc(docRef, { gallery: newGallery });
+            else updateLocalData('gallery', newGallery);
         };
 
         // --- LOCAL STORAGE HELPERS ---
@@ -134,7 +129,7 @@
             
             // Render Total
             if(data.totalDonation) {
-                document.getElementById('total-amount-display').innerText = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.totalDonation);
+                document.getElementById('total-amount-display').innerText = formatRupiah(data.totalDonation);
                 document.getElementById('total-input').value = data.totalDonation;
             }
             
@@ -152,12 +147,20 @@
             // Render Plan
             if(data.strategicPlan) renderPlanTable(data.strategicPlan);
 
-            // Render Gallery (NEW)
+            // Render Fund Allocation (NEW)
+            if(data.fundAllocation) renderFundTable(data.fundAllocation, data.totalDonation);
+
+            // Render Gallery
             if(data.gallery) renderGallery(data.gallery);
             
             lucide.createIcons();
         }
 
+        function formatRupiah(number) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
+        }
+
+        window.formatRupiah = formatRupiah; // Expose global
         initApp();
     </script>
 
@@ -240,11 +243,11 @@
             <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-50">
                 <div>
                     <h3 class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="map" class="w-5 h-5 text-blue-600"></i> Rencana Strategis & Realisasi
+                        <i data-lucide="map" class="w-5 h-5 text-blue-600"></i> Rencana Strategis
                     </h3>
                 </div>
                 <button onclick="togglePlanEdit()" class="text-blue-600 hover:bg-blue-100 p-2 rounded-lg text-xs font-semibold flex items-center gap-1">
-                    <i data-lucide="edit-3" class="w-4 h-4"></i> Edit Data
+                    <i data-lucide="edit-3" class="w-4 h-4"></i> Edit
                 </button>
             </div>
             <div id="plan-view" class="p-0 overflow-x-auto">
@@ -255,6 +258,52 @@
                 <div class="mt-4 flex gap-2">
                     <button onclick="addPlanItem()" class="bg-white border px-4 py-2 rounded text-sm flex gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Tambah</button>
                     <button onclick="savePlan()" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-bold ml-auto">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- LAPORAN PENGGUNAAN DANA (BARU) -->
+        <div class="mb-12 bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-green-50">
+                <div>
+                    <h3 class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="pie-chart" class="w-5 h-5 text-green-600"></i> Laporan Penggunaan Dana
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1">Transparansi keuangan donasi</p>
+                </div>
+                <button onclick="toggleFundEdit()" class="text-green-600 hover:bg-green-100 p-2 rounded-lg text-xs font-semibold flex items-center gap-1">
+                    <i data-lucide="edit-3" class="w-4 h-4"></i> Edit
+                </button>
+            </div>
+
+            <div id="fund-view" class="p-0 overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                        <tr>
+                            <th class="p-4">Kategori</th>
+                            <th class="p-4">Deskripsi</th>
+                            <th class="p-4 text-right">Nominal (Rp)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fund-table-body" class="divide-y divide-slate-100"></tbody>
+                    <tfoot class="bg-slate-50 font-bold text-slate-800">
+                        <tr>
+                            <td colspan="2" class="p-4 text-right">Total Terpakai</td>
+                            <td class="p-4 text-right text-red-600" id="total-expense">Rp 0</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="p-4 text-right">Sisa Dana (Saldo)</td>
+                            <td class="p-4 text-right text-green-600" id="balance-amount">Rp 0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div id="fund-edit" class="hidden p-4 bg-slate-50">
+                <div id="fund-edit-container" class="space-y-4"></div>
+                <div class="mt-4 flex gap-2">
+                    <button onclick="addFundItem()" class="bg-white border px-4 py-2 rounded text-sm flex gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Tambah Item</button>
+                    <button onclick="saveFund()" class="bg-green-600 text-white px-6 py-2 rounded text-sm font-bold ml-auto">Simpan Laporan</button>
                 </div>
             </div>
         </div>
@@ -285,7 +334,7 @@
                             <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
                         </label>
                     </div>
-                    <!-- Hidden input for Caption Prompt -->
+                    <!-- Modal Caption -->
                     <div id="caption-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div class="bg-white p-6 rounded-lg w-full max-w-sm">
                             <h4 class="font-bold mb-2">Keterangan Foto</h4>
@@ -296,7 +345,6 @@
                             </div>
                         </div>
                     </div>
-                    
                     <div id="gallery-grid" class="grid grid-cols-2 gap-3 mb-4"></div>
                 </div>
             </div>
@@ -356,7 +404,7 @@
         }
         function copyRekening() { navigator.clipboard.writeText('1342645761'); alert('Nomor Tersalin'); }
 
-        // --- PLAN ---
+        // --- PLAN LOGIC ---
         function renderPlanTable(data) {
             document.getElementById('plan-table-body').innerHTML = data.map(item => `
                 <tr class="hover:bg-slate-50"><td class="p-4 font-bold">${item.activity}</td><td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${item.statusColor}">${item.status}</span></td><td class="p-4">${item.plan}</td><td class="p-4">${item.actual}</td><td class="p-4 text-blue-600">${item.next}</td></tr>
@@ -384,80 +432,105 @@
         function addPlanItem() { window.appState.strategicPlan.push({ id: Date.now(), activity: "Baru", status: "Rencana", statusColor: "bg-gray-100", plan: "-", actual: "-", next: "-" }); renderPlanEditInputs(); }
         function deletePlanItem(i) { if(confirm('Hapus?')) { window.appState.strategicPlan.splice(i, 1); renderPlanEditInputs(); } }
 
-        // --- GALLERY & IMAGE COMPRESSION (CORE FIX) ---
-        let tempImageBase64 = null;
+        // --- FUND ALLOCATION LOGIC (NEW) ---
+        function renderFundTable(data, totalIncome) {
+            let totalExpense = 0;
+            document.getElementById('fund-table-body').innerHTML = data.map(item => {
+                totalExpense += Number(item.amount);
+                return `<tr class="hover:bg-slate-50"><td class="p-4 font-bold text-slate-800">${item.category}</td><td class="p-4 text-slate-600">${item.description}</td><td class="p-4 text-right font-mono font-medium">${window.formatRupiah(item.amount)}</td></tr>`;
+            }).join('');
+            
+            // Update Footer Calculations
+            document.getElementById('total-expense').innerText = window.formatRupiah(totalExpense);
+            const balance = totalIncome - totalExpense;
+            const balanceEl = document.getElementById('balance-amount');
+            balanceEl.innerText = window.formatRupiah(balance);
+            balanceEl.className = `p-4 text-right font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`;
+        }
 
-        function renderGallery(gallery) {
-            const grid = document.getElementById('gallery-grid');
-            if(!gallery) return;
-            grid.innerHTML = gallery.map(photo => `
-                <div class="relative group overflow-hidden rounded-lg border aspect-video bg-gray-200">
-                    <img src="${photo.url}" alt="${photo.caption}" class="w-full h-full object-cover">
-                    <button onclick="window.deleteGalleryItemBackend(${photo.id})" class="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" title="Hapus Foto"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-3 pointer-events-none">
-                        <p class="text-white text-xs font-medium">${photo.caption}</p>
-                        <p class="text-slate-300 text-[10px]">${photo.date}</p>
+        function toggleFundEdit() {
+            const view = document.getElementById('fund-view'), edit = document.getElementById('fund-edit');
+            if(edit.classList.contains('hidden')) { view.classList.add('hidden'); edit.classList.remove('hidden'); renderFundEditInputs(); } 
+            else { view.classList.remove('hidden'); edit.classList.add('hidden'); }
+        }
+
+        function renderFundEditInputs() {
+            const funds = window.appState.fundAllocation || [];
+            document.getElementById('fund-edit-container').innerHTML = funds.map((item, i) => `
+                <div class="bg-white p-4 border relative rounded shadow-sm group">
+                    <button onclick="deleteFundItem(${i})" class="absolute top-2 right-2 text-red-500 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div><label class="text-xs font-bold text-slate-400">KATEGORI</label><input id="fc-${i}" value="${item.category}" class="w-full border-b py-1 font-bold outline-none focus:border-green-500"></div>
+                        <div><label class="text-xs font-bold text-slate-400">DESKRIPSI</label><input id="fd-${i}" value="${item.description}" class="w-full border-b py-1 outline-none focus:border-green-500"></div>
+                        <div><label class="text-xs font-bold text-slate-400">NOMINAL (ANGKA)</label><input type="number" id="fa-${i}" value="${item.amount}" class="w-full border-b py-1 outline-none focus:border-green-500 font-mono"></div>
                     </div>
                 </div>
             `).join('');
             lucide.createIcons();
         }
 
-        function handleImageUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+        function addFundItem() {
+            const funds = window.appState.fundAllocation || [];
+            funds.push({ id: Date.now(), category: "Kategori Baru", description: "Rincian pengeluaran", amount: 0 });
+            window.appState.fundAllocation = funds;
+            renderFundEditInputs();
+        }
 
-            // 1. Tampilkan Modal Caption
+        function deleteFundItem(i) {
+            if(confirm('Hapus item pengeluaran ini?')) {
+                const funds = window.appState.fundAllocation;
+                funds.splice(i, 1);
+                window.appState.fundAllocation = funds;
+                renderFundEditInputs();
+            }
+        }
+
+        function saveFund() {
+            const funds = window.appState.fundAllocation.map((item, i) => ({
+                id: item.id || Date.now(),
+                category: document.getElementById(`fc-${i}`).value,
+                description: document.getElementById(`fd-${i}`).value,
+                amount: Number(document.getElementById(`fa-${i}`).value)
+            }));
+            window.saveFundToBackend(funds);
+            toggleFundEdit();
+        }
+
+        // --- GALLERY & IMAGE ---
+        let tempImageBase64 = null;
+        function renderGallery(gallery) {
+            const grid = document.getElementById('gallery-grid'); if(!gallery) return;
+            grid.innerHTML = gallery.map(photo => `
+                <div class="relative group overflow-hidden rounded-lg border aspect-video bg-gray-200">
+                    <img src="${photo.url}" alt="${photo.caption}" class="w-full h-full object-cover">
+                    <button onclick="window.deleteGalleryItemBackend(${photo.id})" class="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent flex flex-col justify-end p-3 pointer-events-none"><p class="text-white text-xs font-medium">${photo.caption}</p><p class="text-slate-300 text-[10px]">${photo.date}</p></div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+        function handleImageUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
             document.getElementById('caption-modal').classList.remove('hidden');
-            
-            // 2. Proses Kompresi Gambar (Agar muat di Database)
             const reader = new FileReader();
             reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
+                const img = new Image(); img.src = event.target.result;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Resize ke max 600px width (untuk hemat size)
-                    const MAX_WIDTH = 600;
-                    const scaleSize = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH;
-                    canvas.height = img.height * scaleSize;
-
+                    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+                    const scaleSize = 600 / img.width; canvas.width = 600; canvas.height = img.height * scaleSize;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    // Kompres jadi JPEG kualitas rendah (0.6)
                     tempImageBase64 = canvas.toDataURL('image/jpeg', 0.6);
                 };
             };
             reader.readAsDataURL(file);
         }
-
         function confirmUpload() {
-            const caption = document.getElementById('temp-caption').value || "Dokumentasi Kegiatan";
+            const caption = document.getElementById('temp-caption').value || "Dokumentasi";
             if(tempImageBase64) {
-                const newImage = {
-                    id: Date.now(),
-                    url: tempImageBase64,
-                    caption: caption,
-                    date: new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})
-                };
-                
-                // Simpan ke Backend
-                document.getElementById('upload-text').innerText = "Menyimpan...";
-                window.saveImageToBackend(newImage).then(() => {
-                    document.getElementById('upload-text').innerText = "Upload Bukti";
-                    cancelUpload();
-                });
+                window.saveImageToBackend({ id: Date.now(), url: tempImageBase64, caption: caption, date: new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) }).then(() => { cancelUpload(); });
             }
         }
-
-        function cancelUpload() {
-            document.getElementById('caption-modal').classList.add('hidden');
-            document.getElementById('temp-caption').value = '';
-            tempImageBase64 = null;
-        }
+        function cancelUpload() { document.getElementById('caption-modal').classList.add('hidden'); document.getElementById('temp-caption').value = ''; tempImageBase64 = null; }
 
         document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
     </script>
