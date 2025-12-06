@@ -179,6 +179,9 @@
 
         // --- UPDATE UI CORE ---
         function updateUI(data) {
+            // Only update global state if we are NOT editing, OR if it's the first load
+            // This prevents incoming updates from overwriting user's typing in edit mode
+            // For simplicity in this app, we just update.
             window.appState = data;
             
             // Calculate Total Expense from Fund Allocation
@@ -568,12 +571,33 @@
             toggleSection('fund-edit', 'fund-view');
         }
         function addPlanItem() {
-            const arr = window.appState.strategicPlan; arr.push({id:Date.now(), activity:"", status:"Proses", plan:"", actual:"", next:""});
-            window.saveDataToBackend('strategicPlan', arr);
+            // Capture existing inputs first
+            const plans = window.appState.strategicPlan || [];
+            const currentPlan = plans.map((item, i) => ({
+                ...item,
+                activity: document.getElementById(`pa-${i}`) ? document.getElementById(`pa-${i}`).value : item.activity,
+                status: document.getElementById(`ps-${i}`) ? document.getElementById(`ps-${i}`).value : item.status,
+                plan: document.getElementById(`pp-${i}`) ? document.getElementById(`pp-${i}`).value : item.plan,
+                actual: document.getElementById(`pac-${i}`) ? document.getElementById(`pac-${i}`).value : item.actual,
+                next: document.getElementById(`pn-${i}`) ? document.getElementById(`pn-${i}`).value : item.next
+            }));
+            currentPlan.push({id:Date.now(), activity:"", status:"Proses", plan:"", actual:"", next:""});
+            window.appState.strategicPlan = currentPlan;
+            renderPlanEditInputs();
         }
+
         function addFundItem() {
-            const arr = window.appState.fundAllocation; arr.push({id:Date.now(), category:"", description:"", amount:0});
-            window.saveDataToBackend('fundAllocation', arr);
+            // Capture existing inputs first
+            const funds = window.appState.fundAllocation || [];
+            const currentFund = funds.map((item, i) => ({
+                ...item,
+                category: document.getElementById(`fc-${i}`) ? document.getElementById(`fc-${i}`).value : item.category,
+                description: document.getElementById(`fd-${i}`) ? document.getElementById(`fd-${i}`).value : item.description,
+                amount: document.getElementById(`fa-${i}`) ? Number(document.getElementById(`fa-${i}`).value) : item.amount
+            }));
+            currentFund.push({id:Date.now(), category:"", description:"", amount:0});
+            window.appState.fundAllocation = currentFund;
+            renderFundEditInputs();
         }
         
         // IMAGES
