@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aksi Solidaritas Banjir Sumatera - Laporan Transparansi</title>
+    <title>Laporan & Aksi Solidaritas Banjir Sumatera</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -63,14 +63,14 @@
                 strategicPlan: [
                     { id: 1, activity: "Belanja Logistik", status: "Sedang Berjalan", statusColor: "bg-green-100 text-green-700", plan: "Sarden & Abon", actual: "Beras Cukup", next: "Packing" }
                 ],
-                // Data Alokasi Dana (Baru)
                 fundAllocation: [
-                    { id: 1, category: "Pangan Siap Saji", description: "Sarden, Abon, Susu (Beli di Jawa)", amount: 60000000 },
-                    { id: 2, category: "Sandang & Hygiene", description: "Pakaian Dalam, Pembalut, Popok", amount: 40000000 },
-                    { id: 3, category: "Logistik Kargo", description: "Biaya Pesawat Jakarta-Aceh", amount: 20000000 }
+                    { id: 1, category: "Pangan Siap Saji", description: "Sarden, Abon, Susu", amount: 60000000 },
+                    { id: 2, category: "Sandang & Hygiene", description: "Pakaian Dalam, Pembalut", amount: 40000000 },
+                    { id: 3, category: "Logistik Kargo", description: "Pesawat JKT-Aceh", amount: 20000000 }
                 ],
                 gallery: [
-                   { id: 1, url: 'https://images.unsplash.com/photo-1547638375-ebf04735d792?w=400', caption: 'Dapur Umum', date: '5 Des' }
+                   { id: 1, url: 'https://images.unsplash.com/photo-1547638375-ebf04735d792?w=400', caption: 'Dapur Umum', date: '5 Des' },
+                   { id: 2, url: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?w=400', caption: 'Evakuasi', date: '5 Des' }
                 ]
             };
             
@@ -82,39 +82,18 @@
             }
         }
 
-        // --- FUNGSI UPDATE BACKEND ---
-        window.saveDonationToBackend = async (newTotal) => {
-            if (!useLocalStorage) await updateDoc(docRef, { totalDonation: Number(newTotal) });
-            else updateLocalData('totalDonation', Number(newTotal));
+        // --- UPDATE FUNCTIONS ---
+        window.saveDonationToBackend = async (total) => {
+            if (!useLocalStorage) await updateDoc(docRef, { totalDonation: Number(total) });
+            else { let d = getLocal(); d.totalDonation = Number(total); saveLocal(d); }
         };
-
         window.saveMessageToBackend = async (msg) => {
             if (!useLocalStorage) await updateDoc(docRef, { messages: arrayUnion(msg) });
-            else {
-                let data = getLocal(); data.messages.unshift(msg); saveLocal(data);
-            }
+            else { let d = getLocal(); d.messages.unshift(msg); saveLocal(d); }
         };
-
-        window.savePlanToBackend = async (newPlan) => {
-            if (!useLocalStorage) await updateDoc(docRef, { strategicPlan: newPlan });
-            else updateLocalData('strategicPlan', newPlan);
-        };
-
-        window.saveFundToBackend = async (newFund) => {
-            if (!useLocalStorage) await updateDoc(docRef, { fundAllocation: newFund });
-            else updateLocalData('fundAllocation', newFund);
-        };
-
-        window.saveImageToBackend = async (newImageObj) => {
-            if (!useLocalStorage) await updateDoc(docRef, { gallery: arrayUnion(newImageObj) });
-            else { let data = getLocal(); data.gallery = data.gallery || []; data.gallery.unshift(newImageObj); saveLocal(data); }
-        };
-
-        window.deleteGalleryItemBackend = async (id) => {
-            const currentGallery = window.appState.gallery || [];
-            const newGallery = currentGallery.filter(item => item.id !== id);
-            if (!useLocalStorage) await updateDoc(docRef, { gallery: newGallery });
-            else updateLocalData('gallery', newGallery);
+        window.saveDataToBackend = async (key, data) => { 
+            if (!useLocalStorage) await updateDoc(docRef, { [key]: data });
+            else { updateLocalData(key, data); }
         };
 
         // --- LOCAL STORAGE HELPERS ---
@@ -123,414 +102,506 @@
         function loadFromLocal() { const d = getLocal(); d.totalDonation ? updateUI(d) : initializeDB(); }
         function updateLocalData(key, val) { const d = getLocal(); d[key] = val; saveLocal(d); }
 
-        // --- UPDATE UI ---
+        // --- RENDER FUNCTIONS (Moved Here to Fix ReferenceError) ---
+        
+        // 1. Render Strategic Plan
+        function renderPlanTable(data) {
+            const tableBody = document.getElementById('plan-table-body');
+            if (!tableBody) return;
+            tableBody.innerHTML = data.map(item => `
+                <tr class="border-b hover:bg-slate-50">
+                    <td class="p-3">
+                        <div class="font-bold text-slate-800">${item.activity}</div>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded ${item.statusColor}">${item.status}</span>
+                    </td>
+                    <td class="p-3 text-slate-600">${item.actual}</td>
+                    <td class="p-3 text-blue-600 text-xs">${item.next}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 2. Render Fund Allocation
+        function renderFundTable(data, totalIncome) {
+            let totalExpense = 0;
+            const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
+            
+            const tableBody = document.getElementById('fund-table-body');
+            if(!tableBody) return;
+
+            tableBody.innerHTML = data.map((item, i) => {
+                totalExpense += Number(item.amount);
+                return `<tr class="border-b"><td class="p-3"><div class="font-bold text-slate-800">${item.category}</div><div class="text-xs text-slate-500">${item.description}</div></td><td class="p-3 text-right font-mono">${window.formatRupiah(item.amount)}</td></tr>`;
+            }).join('');
+
+            document.getElementById('total-expense').innerText = window.formatRupiah(totalExpense);
+            const balance = totalIncome - totalExpense;
+            document.getElementById('balance-amount').innerText = window.formatRupiah(balance);
+
+            const barContainer = document.getElementById('fund-visual-bar');
+            const legendContainer = document.getElementById('fund-legend');
+            if(barContainer && legendContainer) {
+                barContainer.innerHTML = ''; legendContainer.innerHTML = '';
+                
+                data.forEach((item, i) => {
+                    const percent = (item.amount / totalIncome) * 100;
+                    const color = colors[i % colors.length];
+                    const segment = document.createElement('div');
+                    segment.className = `${color} h-full`; segment.style.width = `${percent}%`;
+                    barContainer.appendChild(segment);
+                    legendContainer.innerHTML += `<div class="flex items-center gap-1 text-xs text-slate-600"><div class="w-3 h-3 rounded-full ${color}"></div><span>${item.category} (${Math.round(percent)}%)</span></div>`;
+                });
+                if(balance > 0) {
+                    const percentBalance = (balance / totalIncome) * 100;
+                    const segment = document.createElement('div');
+                    segment.className = `bg-slate-200 h-full`; segment.style.width = `${percentBalance}%`;
+                    barContainer.appendChild(segment);
+                    legendContainer.innerHTML += `<div class="flex items-center gap-1 text-xs text-slate-600"><div class="w-3 h-3 rounded-full bg-slate-200"></div><span>Sisa (${Math.round(percentBalance)}%)</span></div>`;
+                }
+            }
+        }
+
+        // 3. Render Gallery
+        function renderGallery(gallery) {
+            const container = document.getElementById('gallery-carousel');
+            if(!gallery || !container) return;
+            container.innerHTML = gallery.map(photo => `
+                <div class="min-w-[280px] md:min-w-[350px] aspect-video relative rounded-lg overflow-hidden snap-center border bg-slate-200">
+                    <img src="${photo.url}" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent flex flex-col justify-end p-3 pointer-events-none">
+                        <p class="text-white text-xs font-bold">${photo.caption}</p>
+                        <p class="text-slate-300 text-[10px]">${photo.date}</p>
+                    </div>
+                    <button onclick="window.deleteItem('gallery', ${gallery.indexOf(photo)})" class="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full opacity-50 hover:opacity-100 no-print pointer-events-auto"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // --- UPDATE UI CORE ---
         function updateUI(data) {
             window.appState = data;
             
-            // Render Total
+            // Calculate Total Expense from Fund Allocation
+            let totalExpense = 0;
+            if(data.fundAllocation) {
+                totalExpense = data.fundAllocation.reduce((acc, item) => acc + Number(item.amount), 0);
+            }
+
+            // 1. Total & Expense Progress Bar
             if(data.totalDonation) {
+                // Update Displays
                 document.getElementById('total-amount-display').innerText = formatRupiah(data.totalDonation);
                 document.getElementById('total-input').value = data.totalDonation;
+                
+                document.getElementById('used-display').innerText = formatRupiah(totalExpense);
+                
+                const remaining = data.totalDonation - totalExpense;
+                document.getElementById('remaining-display').innerText = formatRupiah(remaining);
+
+                // Calculate %
+                const percent = Math.min((totalExpense / data.totalDonation) * 100, 100);
+                document.getElementById('donation-bar').style.width = `${percent}%`;
+                document.getElementById('donation-percent').innerText = `${Math.round(percent)}% Tersalurkan`;
             }
             
-            // Render Marquee
+            // 2. Marquee
             if(data.messages) {
                 const container = document.getElementById('marquee-container');
-                const items = data.messages.map(msg => `
-                    <span class="flex items-center gap-2 text-sm font-medium text-blue-200 mx-4">
-                        <i data-lucide="heart" class="w-4 h-4 text-red-500 fill-red-500"></i> ${msg}
-                    </span>
-                `).join('');
-                container.innerHTML = items + items;
+                if(container) {
+                    const items = data.messages.map(msg => `
+                        <span class="flex items-center gap-2 text-sm font-medium text-blue-200 mx-4">
+                            <i data-lucide="heart" class="w-4 h-4 text-red-500 fill-red-500"></i> ${msg}
+                        </span>
+                    `).join('');
+                    container.innerHTML = items + items;
+                }
             }
             
-            // Render Plan
+            // 3. Tables & Lists
             if(data.strategicPlan) renderPlanTable(data.strategicPlan);
-
-            // Render Fund Allocation (NEW)
             if(data.fundAllocation) renderFundTable(data.fundAllocation, data.totalDonation);
-
-            // Render Gallery
             if(data.gallery) renderGallery(data.gallery);
             
             lucide.createIcons();
         }
 
-        function formatRupiah(number) {
-            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-        }
+        window.formatRupiah = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+        
+        window.deleteItem = (key, idx) => {
+            if(confirm('Hapus item ini?')) {
+                const arr = window.appState[key];
+                arr.splice(idx, 1);
+                window.saveDataToBackend(key, arr);
+            }
+        };
 
-        window.formatRupiah = formatRupiah; // Expose global
         initApp();
     </script>
 
-    <!-- Custom Fonts -->
+    <!-- Custom Fonts & Print CSS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         .animate-marquee { display: flex; animation: marquee 20s linear infinite; }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Carousel Scroll Snap */
+        .snap-x { scroll-snap-type: x mandatory; }
+        .snap-center { scroll-snap-align: center; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* PRINT STYLES */
+        @media print {
+            body { background: white; color: black; }
+            .no-print, header button, .animate-marquee, form, .fixed, .sticky { display: none !important; }
+            .print-only { display: block !important; }
+            .container { max-width: 100% !important; padding: 0 !important; }
+            .bg-white, .shadow-lg, .rounded-xl { box-shadow: none !important; border: 1px solid #ddd !important; border-radius: 0 !important; }
+            .text-white { color: black !important; }
+            .bg-slate-900, .bg-blue-700, .bg-gradient-to-br { background: none !important; color: black !important; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #000; padding: 8px; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
 
-    <!-- RUNNING TEXT -->
-    <div class="bg-slate-900 text-white py-2 overflow-hidden relative z-20 shadow-md">
+    <!-- RUNNING TEXT (No Print) -->
+    <div class="bg-slate-900 text-white py-2 overflow-hidden relative z-20 shadow-md no-print">
         <div id="marquee-container" class="animate-marquee items-center gap-8 whitespace-nowrap pl-4"></div>
     </div>
 
-    <!-- HERO SECTION -->
+    <!-- HEADER & FUND PROGRESS -->
     <header class="bg-gradient-to-br from-blue-700 to-slate-800 text-white pt-6 pb-24 px-4 relative overflow-hidden">
-        <div class="absolute top-0 left-0 w-full h-full opacity-10" style="background-image: url('https://www.transparenttextures.com/patterns/rain.png');"></div>
+        <div class="absolute top-0 left-0 w-full h-full opacity-10 no-print" style="background-image: url('https://www.transparenttextures.com/patterns/rain.png');"></div>
         <div class="max-w-4xl mx-auto relative z-10">
-            <div class="flex items-center gap-4 mb-8">
-                <img src="https://i.ibb.co.com/KxWySDqp/logo-cpi.png" alt="Logo" class="w-16 h-16 rounded-full shadow-lg">
+            <!-- Header Identity -->
+            <div class="flex items-center gap-4 mb-6">
+                <img src="https://i.ibb.co.com/KxWySDqp/logo-cpi.png" alt="Logo" class="w-16 h-16 rounded-full shadow-lg border-2 border-white">
                 <div>
-                    <h2 class="text-xl md:text-2xl font-bold text-white">Yayasan Cakrawala Peduli Indonesia</h2>
-                    <p class="text-blue-200 text-sm">Aksi Solidaritas Kemanusiaan</p>
+                    <h2 class="text-xl md:text-2xl font-bold">Yayasan Cakrawala Peduli Indonesia</h2>
+                    <p class="text-blue-200 text-sm">Laporan Pertanggungjawaban Publik</p>
                 </div>
+                <!-- Print Button (Desktop) -->
+                <button onclick="window.print()" class="ml-auto bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 no-print transition">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan
+                </button>
             </div>
 
-            <div class="text-center">
-                <div class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 animate-pulse">
-                    <i data-lucide="alert-triangle" class="w-4 h-4"></i> Darurat Bencana
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 animate-pulse no-print">
+                    <i data-lucide="alert-triangle" class="w-4 h-4"></i> Status: Distribusi Tahap Akhir
                 </div>
                 <h1 class="text-3xl md:text-5xl font-extrabold mb-4 leading-tight">Aksi Solidaritas Banjir Sumatera</h1>
-                <p class="text-blue-100 text-lg md:text-xl mb-8 max-w-2xl mx-auto">Bantu saudara kita di Aceh, Sumatera Utara, dan Sumatera Barat.</p>
             </div>
 
-            <!-- TOTAL DONATION -->
-            <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl max-w-lg mx-auto transform hover:scale-105 transition-transform duration-300">
-                <div class="flex items-center justify-center gap-2 mb-2 text-blue-200 text-sm font-semibold uppercase tracking-widest">
-                    <i data-lucide="trending-up" class="w-4 h-4"></i> Total Donasi Terkumpul
+            <!-- TOTAL & EXPENSE PROGRESS BAR CARD -->
+            <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl max-w-2xl mx-auto">
+                <div class="flex justify-between items-end mb-2">
+                    <span class="text-blue-200 text-xs font-bold uppercase tracking-wider">Status Dana</span>
+                    <span class="text-blue-200 text-xs">Tersalurkan: <span id="used-display" class="font-mono text-yellow-300">Rp 0</span></span>
                 </div>
-                <div class="flex items-center justify-center gap-3">
-                    <div id="display-mode" class="relative group">
-                        <span id="total-amount-display" class="text-4xl md:text-6xl font-bold text-yellow-400 drop-shadow-lg font-mono">Rp 0</span>
-                        <button onclick="toggleEditMode()" class="absolute -right-8 top-2 opacity-0 group-hover:opacity-100 text-white/50 hover:text-white transition-opacity"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                
+                <!-- Angka Besar (Total Donasi) -->
+                <div class="flex flex-col mb-4">
+                    <div class="text-xs text-blue-200 mb-1">Total Donasi Terkumpul:</div>
+                    <div class="flex items-center gap-3">
+                        <div id="display-mode" class="relative group">
+                            <span id="total-amount-display" class="text-4xl md:text-5xl font-bold text-white drop-shadow-lg font-mono">Rp 0</span>
+                            <button onclick="toggleEditMode()" class="absolute -right-6 top-0 opacity-0 group-hover:opacity-100 text-white/50 hover:text-white no-print"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                        </div>
+                        <!-- Hidden Edit Fields -->
+                        <div id="edit-mode" class="hidden flex flex-col gap-2 bg-white p-2 rounded text-black absolute z-50 shadow-xl top-10">
+                            <label class="text-xs font-bold">Total Donasi:</label>
+                            <input type="number" id="total-input" class="border p-1 rounded w-full">
+                            <button onclick="saveDonation()" class="bg-green-600 text-white p-1 rounded text-sm w-full">Simpan</button>
+                        </div>
                     </div>
-                    <div id="edit-mode" class="hidden flex items-center gap-2">
-                        <input type="number" id="total-input" class="text-slate-900 px-3 py-1 rounded text-2xl font-bold w-48 text-center outline-none">
-                        <button onclick="saveDonation()" class="bg-green-500 p-2 rounded hover:bg-green-600 text-white"><i data-lucide="save" class="w-5 h-5"></i></button>
-                    </div>
+                </div>
+
+                <!-- Progress Bar Visual (Used vs Total) -->
+                <div class="w-full bg-slate-900/50 rounded-full h-4 mb-2 overflow-hidden border border-white/10 relative">
+                    <div id="donation-bar" class="bg-gradient-to-r from-green-400 to-emerald-600 h-4 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-xs font-bold">
+                    <span class="text-green-300" id="donation-percent">0% Tersalurkan</span>
+                    <span class="text-blue-200">Sisa Saldo: <span id="remaining-display" class="text-white">Rp 0</span></span>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- COUNTDOWN -->
-    <div class="bg-white shadow-lg rounded-xl mx-4 -mt-16 p-6 max-w-4xl md:mx-auto relative z-20 border border-slate-200">
-        <div class="text-center">
-            <h2 class="text-slate-500 text-sm font-semibold uppercase tracking-widest mb-4">Batas Akhir Donasi (Hari Ini 22:00 WIB)</h2>
-            <div id="timer-active" class="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                <div class="bg-slate-900 text-white p-4 rounded-lg"><span id="hours" class="block text-3xl md:text-5xl font-mono font-bold">00</span><span class="text-xs text-slate-400">Jam</span></div>
-                <div class="bg-slate-900 text-white p-4 rounded-lg"><span id="minutes" class="block text-3xl md:text-5xl font-mono font-bold">00</span><span class="text-xs text-slate-400">Menit</span></div>
-                <div class="bg-red-600 text-white p-4 rounded-lg shadow-lg animate-pulse"><span id="seconds" class="block text-3xl md:text-5xl font-mono font-bold">00</span><span class="text-xs text-red-100">Detik</span></div>
-            </div>
-            <div id="timer-expired" class="hidden bg-red-50 text-red-700 p-6 rounded-lg border border-red-200"><h3 class="text-2xl font-bold">Penggalangan Dana Ditutup</h3></div>
-        </div>
-    </div>
-
     <!-- MAIN CONTENT -->
-    <main class="flex-grow container mx-auto px-4 py-12 max-w-5xl">
+    <main class="flex-grow container mx-auto px-4 py-8 max-w-5xl -mt-10 relative z-20">
 
-        <!-- STRATEGIC PLAN -->
-        <div class="mb-12 bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-50">
-                <div>
-                    <h3 class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="map" class="w-5 h-5 text-blue-600"></i> Rencana Strategis
-                    </h3>
-                </div>
-                <button onclick="togglePlanEdit()" class="text-blue-600 hover:bg-blue-100 p-2 rounded-lg text-xs font-semibold flex items-center gap-1">
-                    <i data-lucide="edit-3" class="w-4 h-4"></i> Edit
-                </button>
+        <!-- 1. EVIDEN CAROUSEL -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center mb-3 px-2">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2"><i data-lucide="camera" class="w-5 h-5 text-blue-600"></i> Dokumentasi Lapangan</h3>
+                <label class="cursor-pointer text-blue-600 text-xs font-bold hover:underline no-print">
+                    + Upload Foto
+                    <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                </label>
             </div>
-            <div id="plan-view" class="p-0 overflow-x-auto">
-                <table class="w-full text-left text-sm"><tbody id="plan-table-body" class="divide-y divide-slate-100"></tbody></table>
-            </div>
-            <div id="plan-edit" class="hidden p-4 bg-slate-50">
-                <div id="plan-edit-container" class="space-y-4"></div>
-                <div class="mt-4 flex gap-2">
-                    <button onclick="addPlanItem()" class="bg-white border px-4 py-2 rounded text-sm flex gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Tambah</button>
-                    <button onclick="savePlan()" class="bg-blue-600 text-white px-6 py-2 rounded text-sm font-bold ml-auto">Simpan</button>
-                </div>
+            
+            <div class="relative group">
+                <div id="gallery-carousel" class="flex overflow-x-auto gap-4 py-2 snap-x scrollbar-hide scroll-smooth"></div>
+                <button onclick="scrollGallery(-1)" class="absolute left-0 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white hidden md:block no-print"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                <button onclick="scrollGallery(1)" class="absolute right-0 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white hidden md:block no-print"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
             </div>
         </div>
 
-        <!-- LAPORAN PENGGUNAAN DANA (BARU) -->
-        <div class="mb-12 bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-green-50">
-                <div>
-                    <h3 class="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="pie-chart" class="w-5 h-5 text-green-600"></i> Laporan Penggunaan Dana
-                    </h3>
-                    <p class="text-xs text-slate-500 mt-1">Transparansi keuangan donasi</p>
-                </div>
-                <button onclick="toggleFundEdit()" class="text-green-600 hover:bg-green-100 p-2 rounded-lg text-xs font-semibold flex items-center gap-1">
-                    <i data-lucide="edit-3" class="w-4 h-4"></i> Edit
-                </button>
-            </div>
-
-            <div id="fund-view" class="p-0 overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                        <tr>
-                            <th class="p-4">Kategori</th>
-                            <th class="p-4">Deskripsi</th>
-                            <th class="p-4 text-right">Nominal (Rp)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="fund-table-body" class="divide-y divide-slate-100"></tbody>
-                    <tfoot class="bg-slate-50 font-bold text-slate-800">
-                        <tr>
-                            <td colspan="2" class="p-4 text-right">Total Terpakai</td>
-                            <td class="p-4 text-right text-red-600" id="total-expense">Rp 0</td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" class="p-4 text-right">Sisa Dana (Saldo)</td>
-                            <td class="p-4 text-right text-green-600" id="balance-amount">Rp 0</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-
-            <div id="fund-edit" class="hidden p-4 bg-slate-50">
-                <div id="fund-edit-container" class="space-y-4"></div>
-                <div class="mt-4 flex gap-2">
-                    <button onclick="addFundItem()" class="bg-white border px-4 py-2 rounded text-sm flex gap-2"><i data-lucide="plus" class="w-4 h-4"></i> Tambah Item</button>
-                    <button onclick="saveFund()" class="bg-green-600 text-white px-6 py-2 rounded text-sm font-bold ml-auto">Simpan Laporan</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid md:grid-cols-2 gap-8">
-            <!-- LEFT COLUMN -->
-            <div class="space-y-8">
-                <!-- Message -->
-                <div class="bg-white p-5 rounded-xl border border-blue-100 shadow-sm">
-                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3"><i data-lucide="message-square" class="text-blue-600 w-5 h-5"></i> Kirim Pesan Semangat</h3>
-                    <form onsubmit="handleSendMessage(event)" class="relative">
-                        <input type="text" id="msg-input" placeholder="Tulis doa atau dukunganmu..." class="w-full pl-4 pr-12 py-3 rounded-lg border focus:ring-2 outline-none text-sm" maxlength="60" required>
-                        <button type="submit" class="absolute right-2 top-2 p-1.5 bg-blue-600 text-white rounded-md"><i data-lucide="send" class="w-4 h-4"></i></button>
-                    </form>
-                    <p id="msg-success" class="hidden text-xs text-green-600 mt-2 font-medium">✓ Pesan terkirim!</p>
-                </div>
-
-                <!-- GALLERY -->
-                <div>
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <span class="bg-blue-100 text-blue-700 p-2 rounded-lg"><i data-lucide="camera" class="w-5 h-5"></i></span>
-                            Bukti Kegiatan
-                        </h3>
-                        <label class="cursor-pointer bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-700 transition flex items-center gap-2">
-                            <i data-lucide="upload" class="w-3 h-3"></i>
-                            <span id="upload-text">Upload Bukti</span>
-                            <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
-                        </label>
+        <div class="grid lg:grid-cols-3 gap-8">
+            <!-- LEFT CONTENT (2/3) -->
+            <div class="lg:col-span-2 space-y-8">
+                
+                <!-- 2. STRATEGIC PLAN TABLE -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b flex justify-between items-center">
+                        <h3 class="font-bold flex gap-2"><i data-lucide="map" class="w-5 h-5 text-blue-600"></i> Realisasi Rencana</h3>
+                        <button onclick="toggleSection('plan-edit', 'plan-view')" class="text-xs text-blue-600 font-bold no-print">Edit Data</button>
                     </div>
-                    <!-- Modal Caption -->
-                    <div id="caption-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div class="bg-white p-6 rounded-lg w-full max-w-sm">
-                            <h4 class="font-bold mb-2">Keterangan Foto</h4>
-                            <input type="text" id="temp-caption" placeholder="Contoh: Distribusi di Desa X" class="w-full border p-2 rounded mb-4 text-sm">
-                            <div class="flex justify-end gap-2">
-                                <button onclick="cancelUpload()" class="px-4 py-2 text-slate-500 text-sm">Batal</button>
-                                <button onclick="confirmUpload()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm">Upload</button>
-                            </div>
+                    <div id="plan-view" class="overflow-x-auto">
+                        <table class="w-full text-sm text-left"><tbody id="plan-table-body" class="divide-y"></tbody></table>
+                    </div>
+                    <div id="plan-edit" class="hidden p-4 bg-slate-50 no-print">
+                        <div id="plan-edit-container" class="space-y-2"></div>
+                        <button onclick="addPlanItem()" class="mt-2 text-xs bg-white border px-2 py-1 rounded">+ Tambah</button>
+                        <button onclick="savePlan()" class="mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded">Simpan</button>
+                    </div>
+                </div>
+
+                <!-- 3. FUND ALLOCATION VISUAL & TABLE -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 bg-green-50 border-b flex justify-between items-center">
+                        <h3 class="font-bold flex gap-2"><i data-lucide="pie-chart" class="w-5 h-5 text-green-600"></i> Transparansi Dana</h3>
+                        <button onclick="toggleSection('fund-edit', 'fund-view')" class="text-xs text-green-600 font-bold no-print">Edit Data</button>
+                    </div>
+                    
+                    <!-- Visual Progress Bar for Funds -->
+                    <div class="px-6 pt-6 pb-2">
+                         <div class="flex justify-between text-xs mb-1 text-slate-500 font-semibold">
+                            <span>Komposisi Pengeluaran</span>
+                            <span>Sisa Saldo</span>
                         </div>
+                        <div class="w-full h-6 bg-slate-100 rounded-full overflow-hidden flex" id="fund-visual-bar"></div>
+                        <div class="flex flex-wrap gap-3 mt-2" id="fund-legend"></div>
                     </div>
-                    <div id="gallery-grid" class="grid grid-cols-2 gap-3 mb-4"></div>
+
+                    <div id="fund-view" class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500"><tr><th class="p-3">Item</th><th class="p-3 text-right">Nominal</th></tr></thead>
+                            <tbody id="fund-table-body" class="divide-y"></tbody>
+                            <tfoot class="bg-slate-50 font-bold">
+                                <tr><td class="p-3 text-right">Total Terpakai</td><td class="p-3 text-right text-red-600" id="total-expense">0</td></tr>
+                                <tr><td class="p-3 text-right">Sisa Saldo</td><td class="p-3 text-right text-green-600" id="balance-amount">0</td></tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div id="fund-edit" class="hidden p-4 bg-slate-50 no-print">
+                        <div id="fund-edit-container" class="space-y-2"></div>
+                        <button onclick="addFundItem()" class="mt-2 text-xs bg-white border px-2 py-1 rounded">+ Item</button>
+                        <button onclick="saveFund()" class="mt-2 text-xs bg-green-600 text-white px-3 py-1 rounded">Simpan</button>
+                    </div>
                 </div>
+
             </div>
 
-            <!-- RIGHT COLUMN -->
-            <div class="md:sticky md:top-8 h-fit">
-                <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-100">
-                    <div class="text-center mb-6">
-                        <p class="text-slate-500 text-sm mb-1">Salurkan bantuan melalui</p>
-                        <h3 class="text-xl font-bold text-slate-800">Bank Negara Indonesia (BNI)</h3>
+            <!-- RIGHT CONTENT (1/3) -->
+            <div class="space-y-6">
+                
+                <!-- 4. FAQ SECTION -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h3 class="font-bold mb-3 flex items-center gap-2"><i data-lucide="help-circle" class="w-5 h-5 text-purple-600"></i> Tanya Jawab (FAQ)</h3>
+                    <div class="space-y-2">
+                        <details class="group bg-slate-50 rounded-lg p-2 cursor-pointer">
+                            <summary class="font-semibold text-sm list-none flex justify-between items-center">
+                                Masih terima donasi barang?
+                                <i data-lucide="chevron-down" class="w-4 h-4 group-open:rotate-180 transition"></i>
+                            </summary>
+                            <p class="text-xs text-slate-600 mt-2 leading-relaxed">Saat ini kami fokus mendistribusikan stok yang ada. Penerimaan barang dihentikan sementara untuk efisiensi logistik kargo.</p>
+                        </details>
+                        <details class="group bg-slate-50 rounded-lg p-2 cursor-pointer">
+                            <summary class="font-semibold text-sm list-none flex justify-between items-center">
+                                Dimana posko utamanya?
+                                <i data-lucide="chevron-down" class="w-4 h-4 group-open:rotate-180 transition"></i>
+                            </summary>
+                            <p class="text-xs text-slate-600 mt-2 leading-relaxed">Posko utama di FISIP Universitas Syiah Kuala, Banda Aceh. Kontak Koord Lapangan: 0852-2802-9800.</p>
+                        </details>
+                        <details class="group bg-slate-50 rounded-lg p-2 cursor-pointer">
+                            <summary class="font-semibold text-sm list-none flex justify-between items-center">
+                                Kapan laporan final rilis?
+                                <i data-lucide="chevron-down" class="w-4 h-4 group-open:rotate-180 transition"></i>
+                            </summary>
+                            <p class="text-xs text-slate-600 mt-2 leading-relaxed">Laporan final akan dirilis di halaman ini 3 hari setelah seluruh dana tersalurkan (Estimasi 10 Desember).</p>
+                        </details>
                     </div>
-                    <div class="bg-slate-100 p-4 rounded-xl flex items-center justify-between mb-6">
-                        <div class="text-left"><span class="text-xs text-slate-500 uppercase font-semibold">Nomor Rekening</span><p class="text-2xl font-mono font-bold text-slate-900 tracking-wider">1342645761</p></div>
-                        <button onclick="copyRekening()" class="text-blue-600"><i id="copy-icon" data-lucide="copy" class="w-6 h-6"></i></button>
-                    </div>
-                    <div class="space-y-3">
-                        <a href="https://wa.me/6285228029800" target="_blank" class="w-full bg-green-500 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 shadow-lg no-underline"><i data-lucide="phone" class="w-5 h-5"></i> Konfirmasi WhatsApp</a>
-                    </div>
+                </div>
+
+                <!-- SEND MESSAGE -->
+                <div class="bg-white p-4 rounded-xl border border-blue-100 shadow-sm no-print">
+                    <h3 class="font-bold text-sm mb-2">Kirim Pesan Semangat</h3>
+                    <form onsubmit="handleSendMessage(event)" class="flex gap-2">
+                        <input type="text" id="msg-input" placeholder="Tulis doa..." class="w-full border p-2 rounded text-sm" required>
+                        <button class="bg-blue-600 text-white p-2 rounded"><i data-lucide="send" class="w-4 h-4"></i></button>
+                    </form>
                 </div>
             </div>
         </div>
     </main>
 
-    <footer class="bg-slate-900 text-slate-400 py-8 text-center border-t border-slate-800 mt-auto">
-        <div class="container mx-auto px-4"><p class="text-xs">&copy; 2025 Solidaritas Kemanusiaan.</p></div>
-    </footer>
+    <!-- 5. FLOATING SHARE BUTTONS & FOOTER -->
+    <div class="fixed bottom-0 left-0 w-full bg-white border-t p-3 flex justify-between items-center z-50 no-print shadow-[0_-5px_15px_rgba(0,0,0,0.1)]">
+        <div class="text-xs font-bold text-slate-500 hidden md:block">Bantu sebarkan transparansi ini:</div>
+        <div class="flex gap-2 w-full md:w-auto justify-center">
+            <button onclick="shareSocial('wa')" class="flex-1 md:flex-none bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2">
+                <i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp
+            </button>
+            <button onclick="shareSocial('fb')" class="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2">
+                <i data-lucide="facebook" class="w-4 h-4"></i> Facebook
+            </button>
+            <button onclick="window.print()" class="flex-1 md:flex-none bg-slate-800 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2">
+                <i data-lucide="printer" class="w-4 h-4"></i> Print
+            </button>
+        </div>
+    </div>
 
-    <!-- LOGIC -->
+    <div class="h-16"></div>
+
+    <!-- MODAL CAPTION -->
+    <div id="caption-modal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg w-full max-w-sm shadow-2xl">
+            <h4 class="font-bold mb-2">Keterangan Foto</h4>
+            <input type="text" id="temp-caption" class="w-full border p-2 rounded mb-4 text-sm">
+            <div class="flex justify-end gap-2">
+                <button onclick="cancelUpload()" class="px-4 py-2 text-sm">Batal</button>
+                <button onclick="confirmUpload()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm">Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIC SCRIPT -->
     <script>
-        // --- TIMER ---
-        const targetDate = new Date('2025-12-06T22:00:00+07:00').getTime();
-        setInterval(() => {
-            const now = new Date().getTime(), dist = targetDate - now;
-            if (dist < 0) {
-                document.getElementById('timer-active').classList.add('hidden');
-                document.getElementById('timer-expired').classList.remove('hidden');
-            } else {
-                document.getElementById('hours').innerText = String(Math.floor((dist % (864e5)) / 36e5)).padStart(2,'0');
-                document.getElementById('minutes').innerText = String(Math.floor((dist % 36e5) / 6e4)).padStart(2,'0');
-                document.getElementById('seconds').innerText = String(Math.floor((dist % 6e4) / 1e3)).padStart(2,'0');
+        function toggleSection(editId, viewId) {
+            const edit = document.getElementById(editId), view = document.getElementById(viewId);
+            const isEditing = !edit.classList.contains('hidden');
+            if(isEditing) { edit.classList.add('hidden'); view.classList.remove('hidden'); }
+            else { 
+                edit.classList.remove('hidden'); view.classList.add('hidden'); 
+                if(editId === 'plan-edit') renderPlanEditInputs();
+                if(editId === 'fund-edit') renderFundEditInputs();
             }
-        }, 1000);
-
-        // --- GLOBAL HANDLERS ---
+        }
+        function toggleEditMode() { document.getElementById('edit-mode').classList.toggle('hidden'); }
+        function saveDonation() {
+            const total = document.getElementById('total-input').value;
+            window.saveDonationToBackend(total);
+            toggleEditMode();
+        }
         function handleSendMessage(e) {
             e.preventDefault();
             const val = document.getElementById('msg-input').value.trim();
-            if(val) { window.saveMessageToBackend(`Dukungan Baru: ${val}`); document.getElementById('msg-input').value = ''; }
+            if(val) { window.saveMessageToBackend(`Dukungan: ${val}`); document.getElementById('msg-input').value = ''; alert('Pesan terkirim!'); }
         }
+        function shareSocial(type) {
+            const url = encodeURIComponent(window.location.href);
+            const text = encodeURIComponent("Alhamdulillah, donasi banjir Sumatera sudah tersalurkan. Cek laporan transparansinya di sini:");
+            if(type === 'wa') window.open(`https://wa.me/?text=${text}%20${url}`);
+            if(type === 'fb') window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`);
+        }
+        function scrollGallery(dir) { document.getElementById('gallery-carousel').scrollBy({ left: dir * 300, behavior: 'smooth' }); }
 
-        function toggleEditMode() {
-            document.getElementById('display-mode').classList.add('hidden'); document.getElementById('edit-mode').classList.remove('hidden');
-        }
-        function saveDonation() {
-            window.saveDonationToBackend(document.getElementById('total-input').value);
-            document.getElementById('display-mode').classList.remove('hidden'); document.getElementById('edit-mode').classList.add('hidden');
-        }
-        function copyRekening() { navigator.clipboard.writeText('1342645761'); alert('Nomor Tersalin'); }
-
-        // --- PLAN LOGIC ---
-        function renderPlanTable(data) {
-            document.getElementById('plan-table-body').innerHTML = data.map(item => `
-                <tr class="hover:bg-slate-50"><td class="p-4 font-bold">${item.activity}</td><td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${item.statusColor}">${item.status}</span></td><td class="p-4">${item.plan}</td><td class="p-4">${item.actual}</td><td class="p-4 text-blue-600">${item.next}</td></tr>
-            `).join('');
-        }
-        function togglePlanEdit() {
-            const view = document.getElementById('plan-view'), edit = document.getElementById('plan-edit');
-            if(edit.classList.contains('hidden')) { view.classList.add('hidden'); edit.classList.remove('hidden'); renderPlanEditInputs(); } 
-            else { view.classList.remove('hidden'); edit.classList.add('hidden'); }
-        }
+        // EDITS
         function renderPlanEditInputs() {
-            const plan = window.appState ? window.appState.strategicPlan : [];
+            const plan = window.appState.strategicPlan || [];
             document.getElementById('plan-edit-container').innerHTML = plan.map((item, i) => `
-                <div class="bg-white p-4 border relative"><button onclick="deletePlanItem(${i})" class="absolute top-2 right-2 text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                <div class="grid gap-2"><input id="ea-${i}" value="${item.activity}" class="border-b font-bold"><input id="ep-${i}" value="${item.plan}" class="border-b"><input id="eac-${i}" value="${item.actual}" class="border-b"><input id="en-${i}" value="${item.next}" class="border-b"></div></div>
-            `).join('');
-            lucide.createIcons();
-        }
-        function savePlan() {
-            const plan = window.appState.strategicPlan.map((item, i) => ({
-                ...item, activity: document.getElementById(`ea-${i}`).value, plan: document.getElementById(`ep-${i}`).value, actual: document.getElementById(`eac-${i}`).value, next: document.getElementById(`en-${i}`).value
-            }));
-            window.savePlanToBackend(plan); togglePlanEdit();
-        }
-        function addPlanItem() { window.appState.strategicPlan.push({ id: Date.now(), activity: "Baru", status: "Rencana", statusColor: "bg-gray-100", plan: "-", actual: "-", next: "-" }); renderPlanEditInputs(); }
-        function deletePlanItem(i) { if(confirm('Hapus?')) { window.appState.strategicPlan.splice(i, 1); renderPlanEditInputs(); } }
-
-        // --- FUND ALLOCATION LOGIC (NEW) ---
-        function renderFundTable(data, totalIncome) {
-            let totalExpense = 0;
-            document.getElementById('fund-table-body').innerHTML = data.map(item => {
-                totalExpense += Number(item.amount);
-                return `<tr class="hover:bg-slate-50"><td class="p-4 font-bold text-slate-800">${item.category}</td><td class="p-4 text-slate-600">${item.description}</td><td class="p-4 text-right font-mono font-medium">${window.formatRupiah(item.amount)}</td></tr>`;
-            }).join('');
-            
-            // Update Footer Calculations
-            document.getElementById('total-expense').innerText = window.formatRupiah(totalExpense);
-            const balance = totalIncome - totalExpense;
-            const balanceEl = document.getElementById('balance-amount');
-            balanceEl.innerText = window.formatRupiah(balance);
-            balanceEl.className = `p-4 text-right font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`;
-        }
-
-        function toggleFundEdit() {
-            const view = document.getElementById('fund-view'), edit = document.getElementById('fund-edit');
-            if(edit.classList.contains('hidden')) { view.classList.add('hidden'); edit.classList.remove('hidden'); renderFundEditInputs(); } 
-            else { view.classList.remove('hidden'); edit.classList.add('hidden'); }
-        }
-
-        function renderFundEditInputs() {
-            const funds = window.appState.fundAllocation || [];
-            document.getElementById('fund-edit-container').innerHTML = funds.map((item, i) => `
-                <div class="bg-white p-4 border relative rounded shadow-sm group">
-                    <button onclick="deleteFundItem(${i})" class="absolute top-2 right-2 text-red-500 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div><label class="text-xs font-bold text-slate-400">KATEGORI</label><input id="fc-${i}" value="${item.category}" class="w-full border-b py-1 font-bold outline-none focus:border-green-500"></div>
-                        <div><label class="text-xs font-bold text-slate-400">DESKRIPSI</label><input id="fd-${i}" value="${item.description}" class="w-full border-b py-1 outline-none focus:border-green-500"></div>
-                        <div><label class="text-xs font-bold text-slate-400">NOMINAL (ANGKA)</label><input type="number" id="fa-${i}" value="${item.amount}" class="w-full border-b py-1 outline-none focus:border-green-500 font-mono"></div>
+                <div class="bg-white p-3 border rounded relative text-xs">
+                    <button onclick="window.deleteItem('strategicPlan', ${i})" class="absolute top-2 right-2 text-red-500"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                    <div class="grid gap-2">
+                        <input id="pa-${i}" value="${item.activity}" class="border-b font-bold" placeholder="Kegiatan">
+                        <select id="ps-${i}" class="border-b"><option value="Selesai" ${item.status==='Selesai'?'selected':''}>Selesai</option><option value="Proses" ${item.status==='Proses'?'selected':''}>Proses</option></select>
+                        <input id="pp-${i}" value="${item.plan}" class="border-b" placeholder="Rencana">
+                        <input id="pac-${i}" value="${item.actual}" class="border-b" placeholder="Aktual">
+                        <input id="pn-${i}" value="${item.next}" class="border-b" placeholder="Next">
                     </div>
                 </div>
             `).join('');
             lucide.createIcons();
         }
-
-        function addFundItem() {
-            const funds = window.appState.fundAllocation || [];
-            funds.push({ id: Date.now(), category: "Kategori Baru", description: "Rincian pengeluaran", amount: 0 });
-            window.appState.fundAllocation = funds;
-            renderFundEditInputs();
-        }
-
-        function deleteFundItem(i) {
-            if(confirm('Hapus item pengeluaran ini?')) {
-                const funds = window.appState.fundAllocation;
-                funds.splice(i, 1);
-                window.appState.fundAllocation = funds;
-                renderFundEditInputs();
-            }
-        }
-
-        function saveFund() {
-            const funds = window.appState.fundAllocation.map((item, i) => ({
-                id: item.id || Date.now(),
-                category: document.getElementById(`fc-${i}`).value,
-                description: document.getElementById(`fd-${i}`).value,
-                amount: Number(document.getElementById(`fa-${i}`).value)
-            }));
-            window.saveFundToBackend(funds);
-            toggleFundEdit();
-        }
-
-        // --- GALLERY & IMAGE ---
-        let tempImageBase64 = null;
-        function renderGallery(gallery) {
-            const grid = document.getElementById('gallery-grid'); if(!gallery) return;
-            grid.innerHTML = gallery.map(photo => `
-                <div class="relative group overflow-hidden rounded-lg border aspect-video bg-gray-200">
-                    <img src="${photo.url}" alt="${photo.caption}" class="w-full h-full object-cover">
-                    <button onclick="window.deleteGalleryItemBackend(${photo.id})" class="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent flex flex-col justify-end p-3 pointer-events-none"><p class="text-white text-xs font-medium">${photo.caption}</p><p class="text-slate-300 text-[10px]">${photo.date}</p></div>
+        function renderFundEditInputs() {
+            const fund = window.appState.fundAllocation || [];
+            document.getElementById('fund-edit-container').innerHTML = fund.map((item, i) => `
+                <div class="bg-white p-3 border rounded relative text-xs">
+                    <button onclick="window.deleteItem('fundAllocation', ${i})" class="absolute top-2 right-2 text-red-500"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                    <div class="grid gap-2">
+                        <input id="fc-${i}" value="${item.category}" class="border-b font-bold" placeholder="Kategori">
+                        <input id="fd-${i}" value="${item.description}" class="border-b" placeholder="Deskripsi">
+                        <input type="number" id="fa-${i}" value="${item.amount}" class="border-b font-mono" placeholder="Nominal">
+                    </div>
                 </div>
             `).join('');
             lucide.createIcons();
         }
+        function savePlan() {
+            const newPlan = window.appState.strategicPlan.map((old, i) => ({
+                ...old,
+                activity: document.getElementById(`pa-${i}`).value,
+                status: document.getElementById(`ps-${i}`).value,
+                statusColor: document.getElementById(`ps-${i}`).value === 'Selesai' ? 'bg-slate-200 text-slate-500' : 'bg-green-100 text-green-700',
+                plan: document.getElementById(`pp-${i}`).value,
+                actual: document.getElementById(`pac-${i}`).value,
+                next: document.getElementById(`pn-${i}`).value
+            }));
+            window.saveDataToBackend('strategicPlan', newPlan);
+            toggleSection('plan-edit', 'plan-view');
+        }
+        function saveFund() {
+            const newFund = window.appState.fundAllocation.map((old, i) => ({
+                ...old,
+                category: document.getElementById(`fc-${i}`).value,
+                description: document.getElementById(`fd-${i}`).value,
+                amount: Number(document.getElementById(`fa-${i}`).value)
+            }));
+            window.saveDataToBackend('fundAllocation', newFund);
+            toggleSection('fund-edit', 'fund-view');
+        }
+        function addPlanItem() {
+            const arr = window.appState.strategicPlan; arr.push({id:Date.now(), activity:"", status:"Proses", plan:"", actual:"", next:""});
+            window.saveDataToBackend('strategicPlan', arr);
+        }
+        function addFundItem() {
+            const arr = window.appState.fundAllocation; arr.push({id:Date.now(), category:"", description:"", amount:0});
+            window.saveDataToBackend('fundAllocation', arr);
+        }
+        
+        // IMAGES
+        let tempImageBase64 = null;
         function handleImageUpload(e) {
             const file = e.target.files[0]; if (!file) return;
             document.getElementById('caption-modal').classList.remove('hidden');
             const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image(); img.src = event.target.result;
+            reader.onload = (ev) => {
+                const img = new Image(); img.src = ev.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
-                    const scaleSize = 600 / img.width; canvas.width = 600; canvas.height = img.height * scaleSize;
+                    const scale = 600 / img.width; canvas.width = 600; canvas.height = img.height * scale;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    tempImageBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                    tempImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
                 };
             };
             reader.readAsDataURL(file);
         }
         function confirmUpload() {
-            const caption = document.getElementById('temp-caption').value || "Dokumentasi";
             if(tempImageBase64) {
-                window.saveImageToBackend({ id: Date.now(), url: tempImageBase64, caption: caption, date: new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) }).then(() => { cancelUpload(); });
+                const caption = document.getElementById('temp-caption').value || "Dokumentasi";
+                const newImg = { id: Date.now(), url: tempImageBase64, caption, date: new Date().toLocaleDateString('id-ID') };
+                const arr = window.appState.gallery || []; arr.unshift(newImg);
+                window.saveDataToBackend('gallery', arr).then(cancelUpload);
             }
         }
-        function cancelUpload() { document.getElementById('caption-modal').classList.add('hidden'); document.getElementById('temp-caption').value = ''; tempImageBase64 = null; }
+        function cancelUpload() { document.getElementById('caption-modal').classList.add('hidden'); tempImageBase64 = null; }
 
         document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
     </script>
