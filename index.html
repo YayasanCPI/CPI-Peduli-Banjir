@@ -102,9 +102,7 @@
         function loadFromLocal() { const d = getLocal(); d.totalDonation ? updateUI(d) : initializeDB(); }
         function updateLocalData(key, val) { const d = getLocal(); d[key] = val; saveLocal(d); }
 
-        // --- RENDER FUNCTIONS (Moved Here to Fix ReferenceError) ---
-        
-        // 1. Render Strategic Plan
+        // --- RENDER FUNCTIONS (FIXED) ---
         function renderPlanTable(data) {
             const tableBody = document.getElementById('plan-table-body');
             if (!tableBody) return;
@@ -120,7 +118,6 @@
             `).join('');
         }
 
-        // 2. Render Fund Allocation
         function renderFundTable(data, totalIncome) {
             let totalExpense = 0;
             const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-pink-500'];
@@ -160,12 +157,11 @@
             }
         }
 
-        // 3. Render Gallery
         function renderGallery(gallery) {
             const container = document.getElementById('gallery-carousel');
             if(!gallery || !container) return;
             container.innerHTML = gallery.map(photo => `
-                <div class="min-w-[280px] md:min-w-[350px] aspect-video relative rounded-lg overflow-hidden snap-center border bg-slate-200">
+                <div class="gallery-item min-w-[280px] md:min-w-[350px] aspect-video relative rounded-lg overflow-hidden snap-center border bg-slate-200 break-inside-avoid">
                     <img src="${photo.url}" class="w-full h-full object-cover">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent flex flex-col justify-end p-3 pointer-events-none">
                         <p class="text-white text-xs font-bold">${photo.caption}</p>
@@ -177,22 +173,15 @@
             lucide.createIcons();
         }
 
-        // --- UPDATE UI CORE ---
         function updateUI(data) {
-            // Only update global state if we are NOT editing, OR if it's the first load
-            // This prevents incoming updates from overwriting user's typing in edit mode
-            // For simplicity in this app, we just update.
             window.appState = data;
             
-            // Calculate Total Expense from Fund Allocation
             let totalExpense = 0;
             if(data.fundAllocation) {
                 totalExpense = data.fundAllocation.reduce((acc, item) => acc + Number(item.amount), 0);
             }
 
-            // 1. Total & Expense Progress Bar
             if(data.totalDonation) {
-                // Update Displays
                 document.getElementById('total-amount-display').innerText = formatRupiah(data.totalDonation);
                 document.getElementById('total-input').value = data.totalDonation;
                 
@@ -201,13 +190,11 @@
                 const remaining = data.totalDonation - totalExpense;
                 document.getElementById('remaining-display').innerText = formatRupiah(remaining);
 
-                // Calculate %
                 const percent = Math.min((totalExpense / data.totalDonation) * 100, 100);
                 document.getElementById('donation-bar').style.width = `${percent}%`;
                 document.getElementById('donation-percent').innerText = `${Math.round(percent)}% Tersalurkan`;
             }
             
-            // 2. Marquee
             if(data.messages) {
                 const container = document.getElementById('marquee-container');
                 if(container) {
@@ -220,7 +207,6 @@
                 }
             }
             
-            // 3. Tables & Lists
             if(data.strategicPlan) renderPlanTable(data.strategicPlan);
             if(data.fundAllocation) renderFundTable(data.fundAllocation, data.totalDonation);
             if(data.gallery) renderGallery(data.gallery);
@@ -249,23 +235,48 @@
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         .animate-marquee { display: flex; animation: marquee 20s linear infinite; }
         
-        /* Carousel Scroll Snap */
         .snap-x { scroll-snap-type: x mandatory; }
         .snap-center { scroll-snap-align: center; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* PRINT STYLES */
+        /* --- PRINT STYLES --- */
         @media print {
-            body { background: white; color: black; }
-            .no-print, header button, .animate-marquee, form, .fixed, .sticky { display: none !important; }
-            .print-only { display: block !important; }
-            .container { max-width: 100% !important; padding: 0 !important; }
-            .bg-white, .shadow-lg, .rounded-xl { box-shadow: none !important; border: 1px solid #ddd !important; border-radius: 0 !important; }
+            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .no-print, header button, .animate-marquee, form, .fixed, .sticky, button { display: none !important; }
+            .container { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            .bg-white, .shadow-lg, .rounded-xl { box-shadow: none !important; border: none !important; border-radius: 0 !important; }
+            .bg-slate-50, .bg-green-50 { background-color: #f8fafc !important; }
             .text-white { color: black !important; }
-            .bg-slate-900, .bg-blue-700, .bg-gradient-to-br { background: none !important; color: black !important; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #000; padding: 8px; }
+            .bg-slate-900, .bg-blue-700, .bg-gradient-to-br { background: none !important; color: black !important; border-bottom: 2px solid #000; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; }
+            #gallery-carousel {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 15px !important;
+                overflow: visible !important;
+                padding: 0 !important;
+            }
+            .gallery-item {
+                min-width: auto !important;
+                aspect-ratio: auto !important;
+                page-break-inside: avoid !important;
+                border: 1px solid #eee !important;
+            }
+            .gallery-item img {
+                max-width: 100% !important;
+                height: auto !important;
+                object-fit: contain !important;
+            }
+            .gallery-item .absolute {
+                position: relative !important;
+                background: none !important;
+                color: black !important;
+                padding: 5px !important;
+            }
+            .gallery-item p.text-white { color: black !important; font-weight: bold; }
+            .gallery-item p.text-slate-300 { color: #666 !important; }
         }
     </style>
 </head>
@@ -287,7 +298,6 @@
                     <h2 class="text-xl md:text-2xl font-bold">Yayasan Cakrawala Peduli Indonesia</h2>
                     <p class="text-blue-200 text-sm">Laporan Pertanggungjawaban Publik</p>
                 </div>
-                <!-- Print Button (Desktop) -->
                 <button onclick="window.print()" class="ml-auto bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 no-print transition">
                     <i data-lucide="printer" class="w-4 h-4"></i> Cetak Laporan
                 </button>
@@ -300,37 +310,47 @@
                 <h1 class="text-3xl md:text-5xl font-extrabold mb-4 leading-tight">Aksi Solidaritas Banjir Sumatera</h1>
             </div>
 
-            <!-- TOTAL & EXPENSE PROGRESS BAR CARD -->
+            <!-- TOTAL & EXPENSE PROGRESS BAR CARD (REVISED FOR LARGER TEXT) -->
             <div class="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl max-w-2xl mx-auto">
-                <div class="flex justify-between items-end mb-2">
-                    <span class="text-blue-200 text-xs font-bold uppercase tracking-wider">Status Dana</span>
-                    <span class="text-blue-200 text-xs">Tersalurkan: <span id="used-display" class="font-mono text-yellow-300">Rp 0</span></span>
+                
+                <!-- TOP ROW: Status Label & Used Amount -->
+                <div class="flex justify-between items-end mb-4">
+                    <span class="text-blue-200 text-sm font-bold uppercase tracking-wider">Status Dana</span>
+                    <div class="text-right">
+                        <span class="text-blue-200 text-xs font-bold uppercase tracking-wide block mb-1">Tersalurkan</span>
+                        <span id="used-display" class="font-mono text-yellow-300 text-2xl font-bold">Rp 0</span>
+                    </div>
                 </div>
                 
-                <!-- Angka Besar (Total Donasi) -->
-                <div class="flex flex-col mb-4">
-                    <div class="text-xs text-blue-200 mb-1">Total Donasi Terkumpul:</div>
-                    <div class="flex items-center gap-3">
-                        <div id="display-mode" class="relative group">
-                            <span id="total-amount-display" class="text-4xl md:text-5xl font-bold text-white drop-shadow-lg font-mono">Rp 0</span>
+                <!-- MIDDLE: Total Donation (Smaller Context) -->
+                <div class="flex items-center gap-3 mb-6 bg-slate-900/30 p-3 rounded-lg border border-white/10">
+                    <div class="flex-grow">
+                        <div class="text-xs text-blue-200">Total Donasi Terkumpul</div>
+                        <div class="relative group">
+                            <span id="total-amount-display" class="text-xl font-bold text-white font-mono">Rp 0</span>
                             <button onclick="toggleEditMode()" class="absolute -right-6 top-0 opacity-0 group-hover:opacity-100 text-white/50 hover:text-white no-print"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
                         </div>
-                        <!-- Hidden Edit Fields -->
-                        <div id="edit-mode" class="hidden flex flex-col gap-2 bg-white p-2 rounded text-black absolute z-50 shadow-xl top-10">
-                            <label class="text-xs font-bold">Total Donasi:</label>
-                            <input type="number" id="total-input" class="border p-1 rounded w-full">
-                            <button onclick="saveDonation()" class="bg-green-600 text-white p-1 rounded text-sm w-full">Simpan</button>
-                        </div>
+                    </div>
+                    <!-- Hidden Edit Fields -->
+                    <div id="edit-mode" class="hidden flex flex-col gap-2 bg-white p-2 rounded text-black absolute z-50 shadow-xl">
+                        <label class="text-xs font-bold">Total Donasi:</label>
+                        <input type="number" id="total-input" class="border p-1 rounded w-full">
+                        <button onclick="saveDonation()" class="bg-green-600 text-white p-1 rounded text-sm w-full">Simpan</button>
                     </div>
                 </div>
 
-                <!-- Progress Bar Visual (Used vs Total) -->
-                <div class="w-full bg-slate-900/50 rounded-full h-4 mb-2 overflow-hidden border border-white/10 relative">
-                    <div id="donation-bar" class="bg-gradient-to-r from-green-400 to-emerald-600 h-4 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                <!-- PROGRESS BAR -->
+                <div class="w-full bg-slate-900/50 rounded-full h-6 mb-3 overflow-hidden border border-white/10 relative">
+                    <div id="donation-bar" class="bg-gradient-to-r from-green-400 to-emerald-600 h-6 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(74,222,128,0.5)]" style="width: 0%"></div>
                 </div>
-                <div class="flex justify-between text-xs font-bold">
-                    <span class="text-green-300" id="donation-percent">0% Tersalurkan</span>
-                    <span class="text-blue-200">Sisa Saldo: <span id="remaining-display" class="text-white">Rp 0</span></span>
+
+                <!-- BOTTOM ROW: Percentage & Remaining Balance -->
+                <div class="flex justify-between items-center mt-2">
+                    <span class="text-green-300 text-xl md:text-2xl font-extrabold drop-shadow-md" id="donation-percent">0% Tersalurkan</span>
+                    <div class="text-right">
+                        <span class="text-blue-200 text-xs font-bold uppercase tracking-wide block mb-1">Sisa Saldo</span>
+                        <span id="remaining-display" class="text-white text-xl font-mono font-bold bg-slate-800/50 px-2 py-1 rounded">Rp 0</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -571,7 +591,6 @@
             toggleSection('fund-edit', 'fund-view');
         }
         function addPlanItem() {
-            // Capture existing inputs first
             const plans = window.appState.strategicPlan || [];
             const currentPlan = plans.map((item, i) => ({
                 ...item,
@@ -587,7 +606,6 @@
         }
 
         function addFundItem() {
-            // Capture existing inputs first
             const funds = window.appState.fundAllocation || [];
             const currentFund = funds.map((item, i) => ({
                 ...item,
@@ -600,7 +618,6 @@
             renderFundEditInputs();
         }
         
-        // IMAGES
         let tempImageBase64 = null;
         function handleImageUpload(e) {
             const file = e.target.files[0]; if (!file) return;
