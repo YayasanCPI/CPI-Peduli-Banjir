@@ -92,8 +92,19 @@
             else { let d = getLocal(); d.messages.unshift(msg); saveLocal(d); }
         };
         window.saveDataToBackend = async (key, data) => { 
-            if (!useLocalStorage) await updateDoc(docRef, { [key]: data });
-            else { updateLocalData(key, data); }
+            try {
+                if (!useLocalStorage) await updateDoc(docRef, { [key]: data });
+                else { updateLocalData(key, data); }
+                return true;
+            } catch (error) {
+                console.error("Gagal menyimpan:", error);
+                if (error.code === 'resource-exhausted' || error.message.includes('exceeds the maximum allowed size')) {
+                    alert("⚠️ PENYIMPANAN PENUH!\n\nDokumen database melebihi batas 1MB.\nSilakan hapus beberapa foto lama dari galeri sebelum menambah data baru.");
+                } else {
+                    alert("Gagal menyimpan data: " + error.message);
+                }
+                throw error;
+            }
         };
 
         // --- LOCAL STORAGE HELPERS ---
@@ -102,7 +113,7 @@
         function loadFromLocal() { const d = getLocal(); d.totalDonation ? updateUI(d) : initializeDB(); }
         function updateLocalData(key, val) { const d = getLocal(); d[key] = val; saveLocal(d); }
 
-        // --- RENDER FUNCTIONS (FIXED) ---
+        // --- RENDER FUNCTIONS ---
         function renderPlanTable(data) {
             const tableBody = document.getElementById('plan-table-body');
             if (!tableBody) return;
@@ -591,6 +602,7 @@
             toggleSection('fund-edit', 'fund-view');
         }
         function addPlanItem() {
+            // Capture existing inputs first
             const plans = window.appState.strategicPlan || [];
             const currentPlan = plans.map((item, i) => ({
                 ...item,
@@ -606,6 +618,7 @@
         }
 
         function addFundItem() {
+            // Capture existing inputs first
             const funds = window.appState.fundAllocation || [];
             const currentFund = funds.map((item, i) => ({
                 ...item,
@@ -627,9 +640,9 @@
                 const img = new Image(); img.src = ev.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
-                    const scale = 600 / img.width; canvas.width = 600; canvas.height = img.height * scale;
+                    const scale = 400 / img.width; canvas.width = 400; canvas.height = img.height * scale;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    tempImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    tempImageBase64 = canvas.toDataURL('image/jpeg', 0.5);
                 };
             };
             reader.readAsDataURL(file);
@@ -639,7 +652,16 @@
                 const caption = document.getElementById('temp-caption').value || "Dokumentasi";
                 const newImg = { id: Date.now(), url: tempImageBase64, caption, date: new Date().toLocaleDateString('id-ID') };
                 const arr = window.appState.gallery || []; arr.unshift(newImg);
-                window.saveDataToBackend('gallery', arr).then(cancelUpload);
+                window.saveDataToBackend('gallery', arr)
+                    .then(cancelUpload)
+                    .catch(error => {
+                        console.error(error);
+                        if (error.code === 'resource-exhausted' || error.message.includes('exceeds the maximum allowed size')) {
+                            alert("Gagal upload: Penyimpanan penuh. Mohon hapus beberapa foto lama atau upload foto dengan ukuran lebih kecil.");
+                        } else {
+                            alert("Gagal upload: " + error.message);
+                        }
+                    });
             }
         }
         function cancelUpload() { document.getElementById('caption-modal').classList.add('hidden'); tempImageBase64 = null; }
